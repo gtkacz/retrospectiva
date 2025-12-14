@@ -113,7 +113,7 @@ def load_and_parse_messages():
             raw_name = name_part[0].strip()
             parsed_name = parse_name(raw_name)
             
-            # Track unrecognized names
+            # Track unrecognized names (but not IGNORE entries)
             if parsed_name is None:
                 unrecognized_names.add(raw_name)
             
@@ -135,7 +135,9 @@ def load_and_parse_messages():
     
     # Filter unwanted messages (same order as notebook)
     df = df.drop(df[df.apply(should_drop, axis=1)].index)
+    # Filter out None and IGNORE entries
     df = df[df['parsed_name'].notna()]
+    df = df[df['parsed_name'] != 'IGNORE']
     
     if df.empty:
         # Provide more debugging info
@@ -186,8 +188,13 @@ def should_drop(row):
 
 def parse_name(raw_name):
     """Map raw name to normalized name."""
+    # Check IGNORE entry first
+    if 'IGNORE' in NAME_MAP and raw_name in NAME_MAP['IGNORE']:
+        return 'IGNORE'
+    
+    # Check other entries
     for key, value in NAME_MAP.items():
-        if raw_name in value:
+        if key != 'IGNORE' and raw_name in value:
             return key
     return None
 
@@ -404,6 +411,10 @@ def main():
         st.session_state.selected_years_key = available_years
     if 'selected_persons_key' not in st.session_state:
         st.session_state.selected_persons_key = available_persons
+    
+    # Filter session state to only include valid options (in case options changed)
+    st.session_state.selected_years_key = [y for y in st.session_state.selected_years_key if y in available_years]
+    st.session_state.selected_persons_key = [p for p in st.session_state.selected_persons_key if p in available_persons]
     
     # Years filter with select all buttons
     col1, col2 = st.sidebar.columns(2)
