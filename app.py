@@ -9,6 +9,14 @@ from pathlib import Path
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import io
+import nltk
+from nltk.corpus import stopwords
+
+# Download NLTK data (stopwords)
+try:
+    nltk.download('stopwords', quiet=True)
+except:
+    pass
 
 # Page configuration
 st.set_page_config(
@@ -199,48 +207,32 @@ def calculate_metrics(df):
 
 
 def get_stopwords():
-    """Get list of common stopwords in Portuguese and English."""
-    # Common Portuguese and English stopwords
-    stopwords = {
-        'O', 'A', 'OS', 'AS', 'UM', 'UMA', 'UNS', 'UMAS', 'DE', 'DA', 'DO', 'DAS', 'DOS',
-        'EM', 'NO', 'NA', 'NOS', 'NAS', 'POR', 'PARA', 'COM', 'SEM', 'SOBRE', 'SOB',
-        'ENTRE', 'ATÉ', 'DESDE', 'CONTRA', 'DURANTE', 'MEDIANTE', 'PERANTE',
-        'QUE', 'QUAL', 'QUAIS', 'QUANDO', 'ONDE', 'COMO', 'PORQUE', 'PORQUÊ',
-        'E', 'OU', 'MAS', 'PORÉM', 'TODAVIA', 'CONTUDO', 'ENTRETANTO',
-        'SE', 'CASO', 'QUANDO', 'ENQUANTO', 'CONFORME', 'CONSOANTE',
-        'EU', 'TU', 'ELE', 'ELA', 'NÓS', 'VÓS', 'ELES', 'ELAS',
-        'ME', 'TE', 'SE', 'NOS', 'VOS', 'LHE', 'LHES',
-        'MEU', 'MINHA', 'MEUS', 'MINHAS', 'TEU', 'TUA', 'TEUS', 'TUAS',
-        'SEU', 'SUA', 'SEUS', 'SUAS', 'NOSSO', 'NOSSA', 'NOSSOS', 'NOSSAS',
-        'VOSSO', 'VOSSA', 'VOSSOS', 'VOSSAS',
-        'ESTE', 'ESTA', 'ESTES', 'ESTAS', 'ESSE', 'ESSA', 'ESSES', 'ESSAS',
-        'AQUELE', 'AQUELA', 'AQUELES', 'AQUELAS', 'ISTO', 'ISSO', 'AQUILO',
-        'AQUI', 'AÍ', 'ALI', 'LÁ', 'CÁ', 'ACOLÁ',
-        'TÃO', 'TANTO', 'TANTA', 'TANTOS', 'TANTAS',
-        'MUITO', 'MUITA', 'MUITOS', 'MUITAS', 'POUCO', 'POUCA', 'POUCOS', 'POUCAS',
-        'MAIS', 'MENOS', 'MELHOR', 'PIOR', 'MAIOR', 'MENOR',
-        'TUDO', 'TODOS', 'TODAS', 'NENHUM', 'NENHUMA', 'NENHUNS', 'NENHUMAS',
-        'ALGUM', 'ALGUMA', 'ALGUNS', 'ALGUMAS', 'CADA', 'VÁRIOS', 'VÁRIAS',
-        'OUTRO', 'OUTRA', 'OUTROS', 'OUTRAS', 'MESMO', 'MESMA', 'MESMOS', 'MESMAS',
-        'TAL', 'TAIS', 'QUALQUER', 'QUAISQUER',
-        'SER', 'ESTAR', 'TER', 'HAVER', 'FAZER', 'IR', 'VIR', 'VER', 'DAR', 'SABER',
-        'PODER', 'QUERER', 'DIZER', 'FALAR', 'CHEGAR', 'DEIXAR', 'FICAR', 'PASSAR',
-        'THE', 'BE', 'TO', 'OF', 'AND', 'A', 'IN', 'THAT', 'HAVE', 'I', 'IT', 'FOR', 'NOT',
-        'ON', 'WITH', 'HE', 'AS', 'YOU', 'DO', 'AT', 'THIS', 'BUT', 'HIS', 'BY', 'FROM',
-        'THEY', 'WE', 'SAY', 'HER', 'SHE', 'OR', 'AN', 'WILL', 'MY', 'ONE', 'ALL', 'WOULD',
-        'THERE', 'THEIR', 'WHAT', 'SO', 'UP', 'OUT', 'IF', 'ABOUT', 'WHO', 'GET', 'WHICH',
-        'GO', 'ME', 'WHEN', 'MAKE', 'CAN', 'LIKE', 'TIME', 'NO', 'JUST', 'HIM', 'KNOW',
-        'TAKE', 'PEOPLE', 'INTO', 'YEAR', 'YOUR', 'GOOD', 'SOME', 'COULD', 'THEM', 'SEE',
-        'OTHER', 'THAN', 'THEN', 'NOW', 'LOOK', 'ONLY', 'COME', 'ITS', 'OVER', 'THINK',
-        'ALSO', 'BACK', 'AFTER', 'USE', 'TWO', 'HOW', 'OUR', 'WORK', 'FIRST', 'WELL',
-        'WAY', 'EVEN', 'NEW', 'WANT', 'BECAUSE', 'ANY', 'THESE', 'GIVE', 'DAY', 'MOST',
-        'US', 'IS', 'ARE', 'WAS', 'WERE', 'BEEN', 'BEING', 'HAS', 'HAD', 'HAVING',
-        'DOES', 'DID', 'DONE', 'DOING', 'WILL', 'WOULD', 'SHOULD', 'COULD', 'MIGHT',
-        'MUST', 'MAY', 'CAN', 'CANNOT', "CAN'T", "WON'T", "WOULDN'T", "SHOULDN'T",
-        "COULDN'T", "MUSTN'T", "MAYN'T", "ISN'T", "AREN'T", "WASN'T", "WEREN'T",
-        "HASN'T", "HAVEN'T", "HADN'T", "DOESN'T", "DIDN'T", "DON'T", "DIDN'T"
+    """Get list of common stopwords in Portuguese and English using NLTK."""
+    # Get Portuguese stopwords from NLTK
+    try:
+        pt_stopwords = set(stopwords.words('portuguese'))
+        # Convert to uppercase to match existing logic
+        pt_stopwords_upper = {word.upper() for word in pt_stopwords}
+    except:
+        pt_stopwords_upper = set()
+    
+    # Get English stopwords from NLTK
+    try:
+        en_stopwords = set(stopwords.words('english'))
+        # Convert to uppercase to match existing logic
+        en_stopwords_upper = {word.upper() for word in en_stopwords}
+    except:
+        en_stopwords_upper = set()
+    
+    # Combine both sets
+    all_stopwords = pt_stopwords_upper.union(en_stopwords_upper)
+    
+    # Add some additional common words that might be missing
+    additional_stopwords = {
+        'KK', 'KKK', 'KKKK', 'KKKKK', 'HAHA', 'HAHAHA', 'RS', 'RSRS', 'RSRSRS'
     }
-    return stopwords
+    
+    return all_stopwords.union(additional_stopwords)
 
 
 def generate_word_cloud(df):
@@ -250,10 +242,10 @@ def generate_word_cloud(df):
     
     # Split into words and filter
     words = re.findall(r'\b\w+\b', all_text.upper())
-    stopwords = get_stopwords()
+    stopwords_set = get_stopwords()
     
     # Filter stopwords and short words
-    filtered_words = [w for w in words if w not in stopwords and len(w) > 2]
+    filtered_words = [w for w in words if w not in stopwords_set and len(w) > 2]
     
     if not filtered_words:
         return None
@@ -263,23 +255,34 @@ def generate_word_cloud(df):
     for word in filtered_words:
         word_freq[word] = word_freq.get(word, 0) + 1
     
-    # Generate word cloud
+    # Generate word cloud with improved settings
     wordcloud = WordCloud(
-        width=800,
-        height=400,
+        width=1600,
+        height=800,
         background_color='white',
         max_words=200,
-        colormap='viridis',
-        relative_scaling=0.5,
+        colormap='plasma',
+        relative_scaling=0.3,
+        prefer_horizontal=0.7,
         min_font_size=10
     ).generate_from_frequencies(word_freq)
     
     return wordcloud
 
 
+def convert_to_percentage(pivot_df):
+    """Convert absolute values in pivot table to row percentages."""
+    # Calculate row sums
+    row_sums = pivot_df.sum(axis=1)
+    # Convert to percentage (avoid division by zero)
+    percentage_df = pivot_df.div(row_sums, axis=0) * 100
+    percentage_df = percentage_df.fillna(0)
+    return percentage_df
+
+
 def get_most_common_word_per_hour_day(df):
     """Find the most common word for each hour/day combination."""
-    stopwords = get_stopwords()
+    stopwords_set = get_stopwords()
     results = []
     
     # Group by day and hour
@@ -292,7 +295,7 @@ def get_most_common_word_per_hour_day(df):
             all_words = []
             for message in hour_data['parsed_message'].dropna():
                 words = re.findall(r'\b\w+\b', str(message).upper())
-                filtered_words = [w for w in words if w not in stopwords and len(w) > 2]
+                filtered_words = [w for w in words if w not in stopwords_set and len(w) > 2]
                 all_words.extend(filtered_words)
             
             if all_words:
@@ -347,7 +350,7 @@ def main():
         return
     
     # Get available years and persons (filter out NaN values)
-    available_years = sorted([y for y in df['year'].unique().tolist() if pd.notna(y)]) if not df.empty else []
+    available_years = sorted([y for y in df['year'].unique().tolist() if pd.notna(y)], reverse=True) if not df.empty else []
     available_persons = sorted([p for p in df['parsed_name'].unique().tolist() if pd.notna(p)]) if not df.empty else []
     
     # Show debug info if no data
@@ -477,7 +480,7 @@ def main():
     # Top users per year
     st.header("Top 10 Usuários por Ano")
     
-    for year in sorted(selected_years):
+    for year in sorted(selected_years, reverse=True):
         year_data = filtered_df[filtered_df['year'] == year]
         if len(year_data) == 0:
             continue
@@ -504,7 +507,7 @@ def main():
     # Most/Least active comparison per year
     st.header("Mais vs Menos Ativos por Ano")
     
-    for year in sorted(selected_years):
+    for year in sorted(selected_years, reverse=True):
         year_data = filtered_df[filtered_df['year'] == year]
         if len(year_data) == 0:
             continue
@@ -552,7 +555,7 @@ def main():
     st.header("Contagem de Mensagens por Pessoa por Ano")
     
     table_data = filtered_df.groupby(['year', 'parsed_name']).size().reset_index(name='count')
-    table_data = table_data.sort_values(['year', 'count'], ascending=[True, False])
+    table_data = table_data.sort_values(['year', 'count'], ascending=[False, False])
     table_data.columns = ['Ano', 'Pessoa', 'Contagem de Mensagens']
     
     st.dataframe(
@@ -601,6 +604,9 @@ def main():
     st.subheader("Mapa de Calor: Dia da Semana x Hora do Dia")
     filtered_df['hour'] = filtered_df['date'].dt.hour
     
+    # Add percentage toggle in sidebar
+    use_percentage = st.sidebar.checkbox("Usar porcentagem nos mapas de calor", value=True, key="heatmap_percentage")
+    
     # Create heatmap data
     heatmap_data = filtered_df.groupby(['day_name', 'hour']).size().reset_index(name='count')
     
@@ -610,6 +616,15 @@ def main():
     # Reindex to ensure correct weekday order
     heatmap_pivot = heatmap_pivot.reindex(day_names)
     
+    # Convert to percentage if toggle is enabled
+    if use_percentage:
+        heatmap_pivot = convert_to_percentage(heatmap_pivot)
+        colorbar_title = "Porcentagem de Mensagens"
+        text_template = '%{text:.1f}%'
+    else:
+        colorbar_title = "Quantidade de Mensagens"
+        text_template = '%{text:.0f}'
+    
     # Create heatmap using plotly
     fig_heatmap = go.Figure(data=go.Heatmap(
         z=heatmap_pivot.values,
@@ -617,9 +632,9 @@ def main():
         y=heatmap_pivot.index,
         colorscale='Viridis',
         text=heatmap_pivot.values,
-        texttemplate='%{text:.0f}',
+        texttemplate=text_template,
         textfont={"size": 10},
-        colorbar=dict(title="Quantidade de Mensagens")
+        colorbar=dict(title=colorbar_title)
     ))
     
     fig_heatmap.update_layout(
@@ -635,9 +650,10 @@ def main():
     st.subheader("Nuvem de Palavras")
     wordcloud = generate_word_cloud(filtered_df)
     if wordcloud:
-        fig_wc, ax = plt.subplots(figsize=(12, 6))
+        fig_wc, ax = plt.subplots(figsize=(16, 8), dpi=100, facecolor='white')
         ax.imshow(wordcloud, interpolation='bilinear')
         ax.axis('off')
+        plt.tight_layout(pad=0)
         st.pyplot(fig_wc)
         plt.close(fig_wc)
     else:
@@ -682,6 +698,13 @@ def main():
         count_pivot = count_pivot[sorted(count_pivot.columns)]
         count_pivot = count_pivot.fillna(0)
         
+        # Convert to percentage if toggle is enabled (reuse the same toggle)
+        if use_percentage:
+            count_pivot = convert_to_percentage(count_pivot)
+            colorbar_title = "Porcentagem da Frequência da Palavra"
+        else:
+            colorbar_title = "Frequência da Palavra"
+        
         # Create custom text for each cell - align with pivot table structure
         text_matrix = []
         for day in day_names:
@@ -697,6 +720,12 @@ def main():
                     row_text.append("")
             text_matrix.append(row_text)
         
+        # Create hover template based on mode
+        if use_percentage:
+            hover_template = 'Dia: %{y}<br>Hora: %{x}<br>Palavra: %{text}<br>Porcentagem: %{z:.1f}%<extra></extra>'
+        else:
+            hover_template = 'Dia: %{y}<br>Hora: %{x}<br>Palavra: %{text}<br>Frequência: %{z}<extra></extra>'
+        
         fig_word_heatmap = go.Figure(data=go.Heatmap(
             z=count_pivot.values,
             x=count_pivot.columns,
@@ -705,8 +734,8 @@ def main():
             text=text_matrix,
             texttemplate='%{text}',
             textfont={"size": 9},
-            colorbar=dict(title="Frequência da Palavra"),
-            hovertemplate='Dia: %{y}<br>Hora: %{x}<br>Palavra: %{text}<br>Frequência: %{z}<extra></extra>'
+            colorbar=dict(title=colorbar_title),
+            hovertemplate=hover_template
         ))
         
         fig_word_heatmap.update_layout(
@@ -741,6 +770,7 @@ def main():
     filtered_df['date_only'] = filtered_df['date'].dt.date
     daily_counts = filtered_df.groupby('date_only').size().reset_index(name='count')
     daily_counts.columns = ['Data', 'Contagem']
+    daily_counts = daily_counts.sort_values('Data', ascending=False)
     
     fig_trend = px.line(
         daily_counts,
