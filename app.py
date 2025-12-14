@@ -369,7 +369,7 @@ def main():
             if len(df) > 0:
                 st.write("Dados de exemplo:")
                 st.dataframe(df.head())
-            st.write("Contagem de nomes brutos:")
+            st.write("Qtd. de nomes brutos:")
             if 'raw_name' in df.columns:
                 st.write(df['raw_name'].value_counts())
         return
@@ -441,7 +441,7 @@ def main():
     heatmap_mode = st.sidebar.radio(
         "Modo de Normalização do Mapa de Calor",
         options=["Por Dia", "Por Semana"],
-        index=0,  # Default to "Por Dia"
+        index=1,  # Default to "Por Semana"
         help="Por Dia: cada célula é relativa ao seu dia da semana. Por Semana: cada célula é relativa à semana inteira.",
         key="heatmap_mode"
     )
@@ -623,7 +623,7 @@ def main():
     st.markdown("---")
     
     # Interactive data table
-    st.header("Contagem de Mensagens por Pessoa por Ano")
+    st.header("Qtd. de Mensagens por Pessoa por Ano")
     
     table_data = filtered_df.groupby(['year', 'parsed_name']).size().reset_index(name='count')
     table_data = table_data.sort_values(['year', 'count'], ascending=[False, False])
@@ -887,7 +887,7 @@ def main():
         daily_counts,
         x='Data',
         y='Contagem',
-        title='Tendência de Contagem de Mensagens ao Longo do Tempo',
+        title='Tendência de Qtd. de Mensagens ao Longo do Tempo',
         labels={'Contagem': 'Número de Mensagens', 'Data': 'Data'},
         markers=True
     )
