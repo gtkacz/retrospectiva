@@ -400,32 +400,60 @@ def main():
     st.title("Retrospectiva Grupo Camburou")
     st.markdown("---")
     
-    # Read CHAT_FILE_URL from environment variable (outside cached function)
+    # Read CHAT_FILE_URL from environment variable or Streamlit secrets (outside cached function)
+    # First try .env file (via os.getenv), then fall back to Streamlit secrets
     chat_file_url = os.getenv('CHAT_FILE_URL', '').strip()
+    
+    # If not found in .env, try Streamlit secrets
+    if not chat_file_url:
+        try:
+            # Check if st.secrets is available and contains CHAT_FILE_URL
+            if hasattr(st, 'secrets') and 'CHAT_FILE_URL' in st.secrets:
+                chat_file_url = str(st.secrets['CHAT_FILE_URL']).strip()
+        except (AttributeError, KeyError, FileNotFoundError, TypeError):
+            # st.secrets might not be available or CHAT_FILE_URL not in secrets
+            chat_file_url = ''
     
     # Check if URL is set before calling cached function
     if not chat_file_url:
         st.error("CHAT_FILE_URL environment variable is not set.")
-        st.info("Certifique-se de que a variável CHAT_FILE_URL está configurada no arquivo .env")
+        st.info("Certifique-se de que a variável CHAT_FILE_URL está configurada no arquivo .env ou nas configurações de secrets do Streamlit")
         
         # Show debugging information
         st.markdown("### CHAT_FILE_URL Debugging")
         chat_file_url_value = os.getenv('CHAT_FILE_URL')
         chat_file_url_stripped = os.getenv('CHAT_FILE_URL', '').strip()
         
-        col1, col2 = st.columns(2)
+        # Check Streamlit secrets
+        secrets_value = None
+        secrets_stripped = ''
+        try:
+            secrets_value = st.secrets.get('CHAT_FILE_URL')
+            secrets_stripped = str(secrets_value).strip() if secrets_value else ''
+        except (AttributeError, KeyError, FileNotFoundError):
+            pass
+        
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.write("**os.getenv('CHAT_FILE_URL'):**")
             if chat_file_url_value is None:
-                st.error(f"`None` (not found)")
+                st.error(f"`None` (not found in .env)")
             else:
                 st.success(f"`{repr(chat_file_url_value)}`")
         with col2:
-            st.write("**After .strip():**")
-            if not chat_file_url_stripped:
-                st.error(f"`{repr(chat_file_url_stripped)}` (empty after strip)")
+            st.write("**st.secrets.get('CHAT_FILE_URL'):**")
+            if secrets_value is None:
+                st.error(f"`None` (not found in secrets)")
             else:
-                st.success(f"`{repr(chat_file_url_stripped)}`")
+                st.success(f"`{repr(secrets_value)}`")
+        with col3:
+            st.write("**Final value (after fallback):**")
+            if not chat_file_url_stripped and not secrets_stripped:
+                st.error(f"`{repr('')}` (not found in either)")
+            elif chat_file_url_stripped:
+                st.success(f"`{repr(chat_file_url_stripped)}` (from .env)")
+            else:
+                st.success(f"`{repr(secrets_stripped)}` (from secrets)")
         
         # Check for related environment variables
         env_vars = {k: v for k, v in os.environ.items()}
@@ -483,26 +511,44 @@ def main():
     except ValueError as e:
         error_msg = str(e)
         st.error(f"Erro ao carregar dados: {error_msg}")
-        st.info("Certifique-se de que a variável CHAT_FILE_URL está configurada no arquivo .env")
+        st.info("Certifique-se de que a variável CHAT_FILE_URL está configurada no arquivo .env ou nas configurações de secrets do Streamlit")
         
         # Specific debugging for CHAT_FILE_URL
         st.markdown("### CHAT_FILE_URL Debugging")
         chat_file_url_value = os.getenv('CHAT_FILE_URL')
         chat_file_url_stripped = os.getenv('CHAT_FILE_URL', '').strip()
         
-        col1, col2 = st.columns(2)
+        # Check Streamlit secrets
+        secrets_value = None
+        secrets_stripped = ''
+        try:
+            if hasattr(st, 'secrets') and 'CHAT_FILE_URL' in st.secrets:
+                secrets_value = st.secrets['CHAT_FILE_URL']
+                secrets_stripped = str(secrets_value).strip() if secrets_value else ''
+        except (AttributeError, KeyError, FileNotFoundError, TypeError):
+            pass
+        
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.write("**os.getenv('CHAT_FILE_URL'):**")
             if chat_file_url_value is None:
-                st.error(f"`None` (not found)")
+                st.error(f"`None` (not found in .env)")
             else:
                 st.success(f"`{repr(chat_file_url_value)}`")
         with col2:
-            st.write("**After .strip():**")
-            if not chat_file_url_stripped:
-                st.error(f"`{repr(chat_file_url_stripped)}` (empty after strip)")
+            st.write("**st.secrets.get('CHAT_FILE_URL'):**")
+            if secrets_value is None:
+                st.error(f"`None` (not found in secrets)")
             else:
-                st.success(f"`{repr(chat_file_url_stripped)}`")
+                st.success(f"`{repr(secrets_value)}`")
+        with col3:
+            st.write("**Final value (after fallback):**")
+            if not chat_file_url_stripped and not secrets_stripped:
+                st.error(f"`{repr('')}` (not found in either)")
+            elif chat_file_url_stripped:
+                st.success(f"`{repr(chat_file_url_stripped)}` (from .env)")
+            else:
+                st.success(f"`{repr(secrets_stripped)}` (from secrets)")
         
         # Check for related environment variables
         env_vars = {k: v for k, v in os.environ.items()}
@@ -556,12 +602,12 @@ def main():
             st.write("Detalhes do erro:")
             st.code(error_msg)
             st.write("**Note:** If CHAT_FILE_URL appears in the environment variables table above but os.getenv() returns None, this is likely a Streamlit caching issue. Try:")
-            st.code("1. Clear Streamlit cache: Settings > Clear cache\n2. Restart the Streamlit server\n3. Check that .env file is in the correct location")
+            st.code("1. Clear Streamlit cache: Settings > Clear cache\n2. Restart the Streamlit server\n3. Check that .env file is in the correct location\n4. Alternatively, configure CHAT_FILE_URL in Streamlit secrets (.streamlit/secrets.toml for local or Streamlit Cloud secrets for remote)")
         return
     except Exception as e:
         error_msg = str(e)
         st.error(f"Erro ao baixar ou analisar dados: {error_msg}")
-        st.info("Verifique se a URL no arquivo .env está correta e acessível")
+        st.info("Verifique se a URL no arquivo .env ou nas configurações de secrets do Streamlit está correta e acessível")
         
         # Show environment variables for any exception to help debug
         st.subheader("Environment Variables (Debug)")
