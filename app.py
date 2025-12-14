@@ -426,6 +426,9 @@ def main():
     
     filtered_df = filter_data(df, selected_years, selected_persons)
     
+    # Add percentage toggle in sidebar (for both heatmaps and bar graphs)
+    use_percentage = st.sidebar.checkbox("Usar porcentagem nos gráficos", value=True, key="graph_percentage")
+    
     # Overview Metrics
     st.header("Métricas Gerais")
     metrics = calculate_metrics(filtered_df)
@@ -466,15 +469,24 @@ def main():
     # Calculate percentages
     total_all_years = year_totals['count'].sum()
     year_totals['percentage'] = (year_totals['count'] / total_all_years * 100) if total_all_years > 0 else 0
-    year_totals['text'] = year_totals['percentage'].apply(lambda x: f'{x:.1f}%')
+    
+    # Use percentage or absolute value based on toggle
+    if use_percentage:
+        year_totals['display_value'] = year_totals['percentage']
+        year_totals['text'] = year_totals['percentage'].apply(lambda x: f'{x:.1f}%')
+        y_label = 'Porcentagem de Mensagens'
+    else:
+        year_totals['display_value'] = year_totals['count']
+        year_totals['text'] = year_totals['count'].apply(lambda x: f'{x:,}')
+        y_label = 'Número de Mensagens'
     
     fig_total = px.bar(
         year_totals,
         x='year',
-        y='count',
+        y='display_value',
         title='Total de Mensagens por Ano',
-        labels={'year': 'Ano', 'count': 'Número de Mensagens'},
-        color='count',
+        labels={'year': 'Ano', 'display_value': y_label},
+        color='display_value',
         color_continuous_scale='viridis',
         text='text'
     )
@@ -498,17 +510,26 @@ def main():
         # Calculate percentages
         total_year = year_counts['Count'].sum()
         year_counts['percentage'] = (year_counts['Count'] / total_year * 100) if total_year > 0 else 0
-        year_counts['text'] = year_counts['percentage'].apply(lambda x: f'{x:.1f}%')
+        
+        # Use percentage or absolute value based on toggle
+        if use_percentage:
+            year_counts['display_value'] = year_counts['percentage']
+            year_counts['text'] = year_counts['percentage'].apply(lambda x: f'{x:.1f}%')
+            x_label = 'Porcentagem de Mensagens'
+        else:
+            year_counts['display_value'] = year_counts['Count']
+            year_counts['text'] = year_counts['Count'].apply(lambda x: f'{x:,}')
+            x_label = 'Número de Mensagens'
         
         st.subheader(year)
         fig_top = px.bar(
             year_counts,
-            x='Count',
+            x='display_value',
             y='Person',
             orientation='h',
             title=f'Top 10 Usuários Mais Ativos em {year}',
-            labels={'Count': 'Número de Mensagens', 'Person': 'Pessoa'},
-            color='Count',
+            labels={'display_value': x_label, 'Person': 'Pessoa'},
+            color='display_value',
             color_continuous_scale='viridis',
             text='text'
         )
@@ -542,22 +563,34 @@ def main():
         
         st.subheader(year)
         
-        comparison_data = pd.DataFrame({
-            'Person': [most_active, least_active],
-            'Count': [most_count, least_count],
-            'Type': ['Mais Ativo', 'Menos Ativo'],
-            'Percentage': [most_percentage, least_percentage]
-        })
-        comparison_data['text'] = comparison_data['Percentage'].apply(lambda x: f'{x:.1f}%')
+        # Use percentage or absolute value based on toggle
+        if use_percentage:
+            comparison_data = pd.DataFrame({
+                'Person': [most_active, least_active],
+                'Count': [most_count, least_count],
+                'DisplayValue': [most_percentage, least_percentage],
+                'Type': ['Mais Ativo', 'Menos Ativo']
+            })
+            comparison_data['text'] = comparison_data['DisplayValue'].apply(lambda x: f'{x:.1f}%')
+            y_label = 'Porcentagem de Mensagens'
+        else:
+            comparison_data = pd.DataFrame({
+                'Person': [most_active, least_active],
+                'Count': [most_count, least_count],
+                'DisplayValue': [most_count, least_count],
+                'Type': ['Mais Ativo', 'Menos Ativo']
+            })
+            comparison_data['text'] = comparison_data['DisplayValue'].apply(lambda x: f'{x:,}')
+            y_label = 'Número de Mensagens'
         
         fig_compare = px.bar(
             comparison_data,
             x='Type',
-            y='Count',
+            y='DisplayValue',
             color='Type',
             text='text',
             title=f'Usuários Mais e Menos Ativos em {year}',
-            labels={'Count': 'Número de Mensagens', 'Type': 'Categoria'},
+            labels={'DisplayValue': y_label, 'Type': 'Categoria'},
             color_discrete_map={'Mais Ativo': '#571089', 'Menos Ativo': '#d55d92'}
         )
         fig_compare.update_traces(textposition='inside', textfont_size=12)
@@ -612,15 +645,24 @@ def main():
     # Calculate percentages
     total_days = day_counts['Contagem'].sum()
     day_counts['percentage'] = (day_counts['Contagem'] / total_days * 100) if total_days > 0 else 0
-    day_counts['text'] = day_counts['percentage'].apply(lambda x: f'{x:.1f}%')
+    
+    # Use percentage or absolute value based on toggle
+    if use_percentage:
+        day_counts['display_value'] = day_counts['percentage']
+        day_counts['text'] = day_counts['percentage'].apply(lambda x: f'{x:.1f}%')
+        y_label = 'Porcentagem de Mensagens'
+    else:
+        day_counts['display_value'] = day_counts['Contagem']
+        day_counts['text'] = day_counts['Contagem'].apply(lambda x: f'{x:,}')
+        y_label = 'Número de Mensagens'
     
     fig_day = px.bar(
         day_counts,
         x='Dia da Semana',
-        y='Contagem',
+        y='display_value',
         title='Mensagens por Dia da Semana',
-        labels={'Contagem': 'Número de Mensagens'},
-        color='Contagem',
+        labels={'display_value': y_label},
+        color='display_value',
         color_continuous_scale='viridis',
         text='text'
     )
@@ -631,9 +673,6 @@ def main():
     # Weekday x Hour heatmap
     st.subheader("Mapa de Calor: Dia da Semana x Hora do Dia")
     filtered_df['hour'] = filtered_df['date'].dt.hour
-    
-    # Add percentage toggle in sidebar
-    use_percentage = st.sidebar.checkbox("Usar porcentagem nos mapas de calor", value=True, key="heatmap_percentage")
     
     # Create heatmap data
     heatmap_data = filtered_df.groupby(['day_name', 'hour']).size().reset_index(name='count')
