@@ -8,8 +8,8 @@ from pathlib import Path
 
 # Page configuration
 st.set_page_config(
-    page_title="WhatsApp Chat Analysis",
-    page_icon="💬",
+    page_title="Retrospectiva Grupo Camburou",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -195,32 +195,32 @@ def calculate_metrics(df):
 
 
 def main():
-    st.title("💬 WhatsApp Chat Analysis - Per Year")
+    st.title("Retrospectiva Grupo Camburou")
     st.markdown("---")
     
     # Load data
     try:
-        with st.spinner("Loading and parsing messages..."):
+        with st.spinner("Carregando e analisando mensagens..."):
             df = load_and_parse_messages()
     except FileNotFoundError as e:
-        st.error(f"❌ File not found: {str(e)}")
-        st.info("💡 Make sure '_chat.txt' is in the same directory as app.py")
+        st.error(f"Arquivo não encontrado: {str(e)}")
+        st.info("Certifique-se de que '_chat.txt' está no mesmo diretório que app.py")
         return
     except ValueError as e:
-        st.error(f"❌ Data parsing error: {str(e)}")
-        with st.expander("🔍 Debug Information"):
-            st.write("This might help identify the issue:")
+        st.error(f"Erro ao analisar dados: {str(e)}")
+        with st.expander("Informações de Depuração"):
+            st.write("Isso pode ajudar a identificar o problema:")
             st.code(str(e))
         return
     except Exception as e:
-        st.error(f"❌ Unexpected error: {str(e)}")
+        st.error(f"Erro inesperado: {str(e)}")
         st.exception(e)
         return
     
     # Check if DataFrame is empty
     if df.empty:
-        st.error("❌ No data was loaded. Please check that '_chat.txt' exists and contains valid messages.")
-        st.info("💡 Debug info: The file might be empty or the parsing logic might need adjustment.")
+        st.error("Nenhum dado foi carregado. Por favor, verifique se '_chat.txt' existe e contém mensagens válidas.")
+        st.info("Informações de depuração: O arquivo pode estar vazio ou a lógica de análise pode precisar de ajuste.")
         return
     
     # Get available years and persons (filter out NaN values)
@@ -229,57 +229,57 @@ def main():
     
     # Show debug info if no data
     if not available_years or not available_persons:
-        st.error("❌ No valid data found after parsing.")
-        with st.expander("🔍 Debug Information"):
-            st.write(f"Total rows after parsing: {len(df)}")
+        st.error("Nenhum dado válido encontrado após a análise.")
+        with st.expander("Informações de Depuração"):
+            st.write(f"Total de linhas após análise: {len(df)}")
             if len(df) > 0:
-                st.write("Sample data:")
+                st.write("Dados de exemplo:")
                 st.dataframe(df.head())
-            st.write("Raw name counts:")
+            st.write("Contagem de nomes brutos:")
             if 'raw_name' in df.columns:
                 st.write(df['raw_name'].value_counts())
         return
     
     # Sidebar filters
-    st.sidebar.header("🔍 Filters")
+    st.sidebar.header("Filtros")
     
     selected_years = st.sidebar.multiselect(
-        "Select Years",
+        "Selecionar Anos",
         options=available_years,
         default=available_years,
-        help="Choose which years to include in the analysis"
+        help="Escolha quais anos incluir na análise"
     )
     
     selected_persons = st.sidebar.multiselect(
-        "Select Persons",
+        "Selecionar Pessoas",
         options=available_persons,
         default=available_persons,
-        help="Choose which persons to include in the analysis"
+        help="Escolha quais pessoas incluir na análise"
     )
     
     # Filter data
     if not selected_years or not selected_persons:
-        st.warning("⚠️ Please select at least one year and one person to view the analysis.")
+        st.warning("Por favor, selecione pelo menos um ano e uma pessoa para visualizar a análise.")
         return
     
     filtered_df = filter_data(df, selected_years, selected_persons)
     
     # Overview Metrics
-    st.header("📊 Overview Metrics")
+    st.header("Métricas Gerais")
     metrics = calculate_metrics(filtered_df)
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Total Messages", f"{metrics['total_messages']:,}")
+        st.metric("Total de Mensagens", f"{metrics['total_messages']:,}")
     with col2:
-        st.metric("Unique Participants", metrics['unique_participants'])
+        st.metric("Participantes Únicos", metrics['unique_participants'])
     with col3:
-        st.metric("Avg Messages per Person", f"{metrics['avg_messages_per_person']:,.1f}")
+        st.metric("Média de Mensagens por Pessoa", f"{metrics['avg_messages_per_person']:,.1f}")
     
     st.markdown("---")
     
     # Per-year message counts per person
-    st.header("📈 Messages per Person per Year")
+    st.header("Mensagens por Pessoa por Ano")
     
     # Create grouped data
     year_person_counts = filtered_df.groupby(['year', 'parsed_name']).size().reset_index(name='count')
@@ -290,23 +290,23 @@ def main():
         x='year',
         y='count',
         color='parsed_name',
-        title='Messages per Person per Year (Stacked)',
-        labels={'year': 'Year', 'count': 'Number of Messages', 'parsed_name': 'Person'},
+        title='Mensagens por Pessoa por Ano (Empilhado)',
+        labels={'year': 'Ano', 'count': 'Número de Mensagens', 'parsed_name': 'Pessoa'},
         barmode='stack'
     )
     fig_stacked.update_layout(height=600, showlegend=True)
     st.plotly_chart(fig_stacked, use_container_width=True)
     
     # Total messages per year
-    st.subheader("Total Messages per Year")
+    st.subheader("Total de Mensagens por Ano")
     year_totals = filtered_df.groupby('year').size().reset_index(name='count')
     
     fig_total = px.bar(
         year_totals,
         x='year',
         y='count',
-        title='Total Messages per Year',
-        labels={'year': 'Year', 'count': 'Number of Messages'},
+        title='Total de Mensagens por Ano',
+        labels={'year': 'Ano', 'count': 'Número de Mensagens'},
         color='count',
         color_continuous_scale='viridis'
     )
@@ -316,7 +316,7 @@ def main():
     st.markdown("---")
     
     # Top users per year
-    st.header("🏆 Top 10 Users per Year")
+    st.header("Top 10 Usuários por Ano")
     
     for year in sorted(selected_years):
         year_data = filtered_df[filtered_df['year'] == year]
@@ -326,14 +326,14 @@ def main():
         year_counts = year_data['parsed_name'].value_counts().head(10).reset_index()
         year_counts.columns = ['Person', 'Count']
         
-        st.subheader(f"Year {year}")
+        st.subheader(year)
         fig_top = px.bar(
             year_counts,
             x='Count',
             y='Person',
             orientation='h',
-            title=f'Top 10 Most Active Users in {year}',
-            labels={'Count': 'Number of Messages', 'Person': 'Person'},
+            title=f'Top 10 Usuários Mais Ativos em {year}',
+            labels={'Count': 'Número de Mensagens', 'Person': 'Pessoa'},
             color='Count',
             color_continuous_scale='viridis'
         )
@@ -343,7 +343,7 @@ def main():
     st.markdown("---")
     
     # Most/Least active comparison per year
-    st.header("⚖️ Most vs Least Active per Year")
+    st.header("Mais vs Menos Ativos por Ano")
     
     for year in sorted(selected_years):
         year_data = filtered_df[filtered_df['year'] == year]
@@ -359,12 +359,12 @@ def main():
         most_count = year_counts.max()
         least_count = year_counts.min()
         
-        st.subheader(f"Year {year}")
+        st.subheader(year)
         
         comparison_data = pd.DataFrame({
             'Person': [most_active, least_active],
             'Count': [most_count, least_count],
-            'Type': ['Most Active', 'Least Active']
+            'Type': ['Mais Ativo', 'Menos Ativo']
         })
         
         fig_compare = px.bar(
@@ -373,9 +373,9 @@ def main():
             y='Count',
             color='Type',
             text='Person',
-            title=f'Most and Least Active Users in {year}',
-            labels={'Count': 'Number of Messages', 'Type': 'Category'},
-            color_discrete_map={'Most Active': '#571089', 'Least Active': '#d55d92'}
+            title=f'Usuários Mais e Menos Ativos em {year}',
+            labels={'Count': 'Número de Mensagens', 'Type': 'Categoria'},
+            color_discrete_map={'Mais Ativo': '#571089', 'Menos Ativo': '#d55d92'}
         )
         fig_compare.update_traces(textposition='outside')
         fig_compare.update_layout(height=400, showlegend=False)
@@ -383,18 +383,18 @@ def main():
         
         col1, col2 = st.columns(2)
         with col1:
-            st.info(f"**Most Active:** {most_active} ({most_count:,} messages)")
+            st.info(f"**Mais Ativo:** {most_active} ({most_count:,} mensagens)")
         with col2:
-            st.info(f"**Least Active:** {least_active} ({least_count:,} messages)")
+            st.info(f"**Menos Ativo:** {least_active} ({least_count:,} mensagens)")
     
     st.markdown("---")
     
     # Interactive data table
-    st.header("📋 Message Counts per Person per Year")
+    st.header("Contagem de Mensagens por Pessoa por Ano")
     
     table_data = filtered_df.groupby(['year', 'parsed_name']).size().reset_index(name='count')
     table_data = table_data.sort_values(['year', 'count'], ascending=[True, False])
-    table_data.columns = ['Year', 'Person', 'Message Count']
+    table_data.columns = ['Ano', 'Pessoa', 'Contagem de Mensagens']
     
     st.dataframe(
         table_data,
@@ -404,50 +404,50 @@ def main():
     )
     
     # Download button
-    csv = table_data.to_csv(index=False)
-    st.download_button(
-        label="📥 Download data as CSV",
-        data=csv,
-        file_name=f"whatsapp_analysis_{datetime.now().strftime('%Y%m%d')}.csv",
-        mime="text/csv"
-    )
+    # csv = table_data.to_csv(index=False)
+    # st.download_button(
+    #     label="Baixar dados como CSV",
+    #     data=csv,
+    #     file_name=f"whatsapp_analysis_{datetime.now().strftime('%Y%m%d')}.csv",
+    #     mime="text/csv"
+    # )
     
     st.markdown("---")
     
     # Additional analyses
-    st.header("📅 Additional Analyses")
+    st.header("Análises Adicionais")
     
     # Messages per day of week
-    st.subheader("Messages per Day of Week")
+    st.subheader("Mensagens por Dia da Semana")
     filtered_df['day_of_week'] = filtered_df['date'].dt.dayofweek
-    day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    day_names = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
     filtered_df['day_name'] = filtered_df['day_of_week'].map(lambda x: day_names[x])
     
     day_counts = filtered_df['day_name'].value_counts().reindex(day_names).reset_index()
-    day_counts.columns = ['Day of Week', 'Count']
+    day_counts.columns = ['Dia da Semana', 'Contagem']
     
     fig_day = px.bar(
         day_counts,
-        x='Day of Week',
-        y='Count',
-        title='Messages per Day of Week',
-        labels={'Count': 'Number of Messages'},
-        color='Count',
+        x='Dia da Semana',
+        y='Contagem',
+        title='Mensagens por Dia da Semana',
+        labels={'Contagem': 'Número de Mensagens'},
+        color='Contagem',
         color_continuous_scale='viridis'
     )
     fig_day.update_layout(height=400)
     st.plotly_chart(fig_day, use_container_width=True)
     
     # Total messages per person (pie chart)
-    st.subheader("Total Messages per Person")
+    st.subheader("Total de Mensagens por Pessoa")
     person_totals = filtered_df['parsed_name'].value_counts().reset_index()
-    person_totals.columns = ['Person', 'Count']
+    person_totals.columns = ['Pessoa', 'Contagem']
     
     fig_pie = px.pie(
         person_totals,
-        values='Count',
-        names='Person',
-        title='Distribution of Messages by Person',
+        values='Contagem',
+        names='Pessoa',
+        title='Distribuição de Mensagens por Pessoa',
         hole=0.4
     )
     fig_pie.update_traces(textposition='inside', textinfo='percent+label')
@@ -455,17 +455,17 @@ def main():
     st.plotly_chart(fig_pie, use_container_width=True)
     
     # Message trends over time
-    st.subheader("Message Trends Over Time")
+    st.subheader("Tendências de Mensagens ao Longo do Tempo")
     filtered_df['date_only'] = filtered_df['date'].dt.date
     daily_counts = filtered_df.groupby('date_only').size().reset_index(name='count')
-    daily_counts.columns = ['Date', 'Count']
+    daily_counts.columns = ['Data', 'Contagem']
     
     fig_trend = px.line(
         daily_counts,
-        x='Date',
-        y='Count',
-        title='Message Count Trend Over Time',
-        labels={'Count': 'Number of Messages', 'Date': 'Date'},
+        x='Data',
+        y='Contagem',
+        title='Tendência de Contagem de Mensagens ao Longo do Tempo',
+        labels={'Contagem': 'Número de Mensagens', 'Data': 'Data'},
         markers=True
     )
     fig_trend.update_layout(height=400)
