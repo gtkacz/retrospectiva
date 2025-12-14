@@ -3,8 +3,12 @@ import os
 import pandas as pd
 import streamlit as st
 import plotly.express as px
+import plotly.graph_objects as go
 from datetime import datetime
 from pathlib import Path
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+import io
 
 # Page configuration
 st.set_page_config(
@@ -194,6 +198,125 @@ def calculate_metrics(df):
     }
 
 
+def get_stopwords():
+    """Get list of common stopwords in Portuguese and English."""
+    # Common Portuguese and English stopwords
+    stopwords = {
+        'O', 'A', 'OS', 'AS', 'UM', 'UMA', 'UNS', 'UMAS', 'DE', 'DA', 'DO', 'DAS', 'DOS',
+        'EM', 'NO', 'NA', 'NOS', 'NAS', 'POR', 'PARA', 'COM', 'SEM', 'SOBRE', 'SOB',
+        'ENTRE', 'ATÉ', 'DESDE', 'CONTRA', 'DURANTE', 'MEDIANTE', 'PERANTE',
+        'QUE', 'QUAL', 'QUAIS', 'QUANDO', 'ONDE', 'COMO', 'PORQUE', 'PORQUÊ',
+        'E', 'OU', 'MAS', 'PORÉM', 'TODAVIA', 'CONTUDO', 'ENTRETANTO',
+        'SE', 'CASO', 'QUANDO', 'ENQUANTO', 'CONFORME', 'CONSOANTE',
+        'EU', 'TU', 'ELE', 'ELA', 'NÓS', 'VÓS', 'ELES', 'ELAS',
+        'ME', 'TE', 'SE', 'NOS', 'VOS', 'LHE', 'LHES',
+        'MEU', 'MINHA', 'MEUS', 'MINHAS', 'TEU', 'TUA', 'TEUS', 'TUAS',
+        'SEU', 'SUA', 'SEUS', 'SUAS', 'NOSSO', 'NOSSA', 'NOSSOS', 'NOSSAS',
+        'VOSSO', 'VOSSA', 'VOSSOS', 'VOSSAS',
+        'ESTE', 'ESTA', 'ESTES', 'ESTAS', 'ESSE', 'ESSA', 'ESSES', 'ESSAS',
+        'AQUELE', 'AQUELA', 'AQUELES', 'AQUELAS', 'ISTO', 'ISSO', 'AQUILO',
+        'AQUI', 'AÍ', 'ALI', 'LÁ', 'CÁ', 'ACOLÁ',
+        'TÃO', 'TANTO', 'TANTA', 'TANTOS', 'TANTAS',
+        'MUITO', 'MUITA', 'MUITOS', 'MUITAS', 'POUCO', 'POUCA', 'POUCOS', 'POUCAS',
+        'MAIS', 'MENOS', 'MELHOR', 'PIOR', 'MAIOR', 'MENOR',
+        'TUDO', 'TODOS', 'TODAS', 'NENHUM', 'NENHUMA', 'NENHUNS', 'NENHUMAS',
+        'ALGUM', 'ALGUMA', 'ALGUNS', 'ALGUMAS', 'CADA', 'VÁRIOS', 'VÁRIAS',
+        'OUTRO', 'OUTRA', 'OUTROS', 'OUTRAS', 'MESMO', 'MESMA', 'MESMOS', 'MESMAS',
+        'TAL', 'TAIS', 'QUALQUER', 'QUAISQUER',
+        'SER', 'ESTAR', 'TER', 'HAVER', 'FAZER', 'IR', 'VIR', 'VER', 'DAR', 'SABER',
+        'PODER', 'QUERER', 'DIZER', 'FALAR', 'CHEGAR', 'DEIXAR', 'FICAR', 'PASSAR',
+        'THE', 'BE', 'TO', 'OF', 'AND', 'A', 'IN', 'THAT', 'HAVE', 'I', 'IT', 'FOR', 'NOT',
+        'ON', 'WITH', 'HE', 'AS', 'YOU', 'DO', 'AT', 'THIS', 'BUT', 'HIS', 'BY', 'FROM',
+        'THEY', 'WE', 'SAY', 'HER', 'SHE', 'OR', 'AN', 'WILL', 'MY', 'ONE', 'ALL', 'WOULD',
+        'THERE', 'THEIR', 'WHAT', 'SO', 'UP', 'OUT', 'IF', 'ABOUT', 'WHO', 'GET', 'WHICH',
+        'GO', 'ME', 'WHEN', 'MAKE', 'CAN', 'LIKE', 'TIME', 'NO', 'JUST', 'HIM', 'KNOW',
+        'TAKE', 'PEOPLE', 'INTO', 'YEAR', 'YOUR', 'GOOD', 'SOME', 'COULD', 'THEM', 'SEE',
+        'OTHER', 'THAN', 'THEN', 'NOW', 'LOOK', 'ONLY', 'COME', 'ITS', 'OVER', 'THINK',
+        'ALSO', 'BACK', 'AFTER', 'USE', 'TWO', 'HOW', 'OUR', 'WORK', 'FIRST', 'WELL',
+        'WAY', 'EVEN', 'NEW', 'WANT', 'BECAUSE', 'ANY', 'THESE', 'GIVE', 'DAY', 'MOST',
+        'US', 'IS', 'ARE', 'WAS', 'WERE', 'BEEN', 'BEING', 'HAS', 'HAD', 'HAVING',
+        'DOES', 'DID', 'DONE', 'DOING', 'WILL', 'WOULD', 'SHOULD', 'COULD', 'MIGHT',
+        'MUST', 'MAY', 'CAN', 'CANNOT', "CAN'T", "WON'T", "WOULDN'T", "SHOULDN'T",
+        "COULDN'T", "MUSTN'T", "MAYN'T", "ISN'T", "AREN'T", "WASN'T", "WEREN'T",
+        "HASN'T", "HAVEN'T", "HADN'T", "DOESN'T", "DIDN'T", "DON'T", "DIDN'T"
+    }
+    return stopwords
+
+
+def generate_word_cloud(df):
+    """Generate word cloud from messages."""
+    # Combine all messages
+    all_text = ' '.join(df['parsed_message'].dropna().astype(str))
+    
+    # Split into words and filter
+    words = re.findall(r'\b\w+\b', all_text.upper())
+    stopwords = get_stopwords()
+    
+    # Filter stopwords and short words
+    filtered_words = [w for w in words if w not in stopwords and len(w) > 2]
+    
+    if not filtered_words:
+        return None
+    
+    # Count word frequencies
+    word_freq = {}
+    for word in filtered_words:
+        word_freq[word] = word_freq.get(word, 0) + 1
+    
+    # Generate word cloud
+    wordcloud = WordCloud(
+        width=800,
+        height=400,
+        background_color='white',
+        max_words=200,
+        colormap='viridis',
+        relative_scaling=0.5,
+        min_font_size=10
+    ).generate_from_frequencies(word_freq)
+    
+    return wordcloud
+
+
+def get_most_common_word_per_hour_day(df):
+    """Find the most common word for each hour/day combination."""
+    stopwords = get_stopwords()
+    results = []
+    
+    # Group by day and hour
+    for day_name in df['day_name'].unique():
+        day_data = df[df['day_name'] == day_name]
+        for hour in sorted(day_data['hour'].unique()):
+            hour_data = day_data[day_data['hour'] == hour]
+            
+            # Extract words from messages in this hour/day
+            all_words = []
+            for message in hour_data['parsed_message'].dropna():
+                words = re.findall(r'\b\w+\b', str(message).upper())
+                filtered_words = [w for w in words if w not in stopwords and len(w) > 2]
+                all_words.extend(filtered_words)
+            
+            if all_words:
+                # Count word frequencies
+                word_counts = pd.Series(all_words).value_counts()
+                most_common_word = word_counts.index[0]
+                most_common_count = word_counts.iloc[0]
+                results.append({
+                    'day_name': day_name,
+                    'hour': hour,
+                    'most_common_word': most_common_word,
+                    'count': most_common_count
+                })
+            else:
+                results.append({
+                    'day_name': day_name,
+                    'hour': hour,
+                    'most_common_word': '-',
+                    'count': 0
+                })
+    
+    return pd.DataFrame(results)
+
+
 def main():
     st.title("Retrospectiva Grupo Camburou")
     st.markdown("---")
@@ -243,19 +366,55 @@ def main():
     # Sidebar filters
     st.sidebar.header("Filtros")
     
+    # Initialize session state for selections
+    if 'selected_years_key' not in st.session_state:
+        st.session_state.selected_years_key = available_years
+    if 'selected_persons_key' not in st.session_state:
+        st.session_state.selected_persons_key = available_persons
+    
+    # Years filter with select all buttons
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        if st.button("Selecionar Todos", key="select_all_years_btn"):
+            st.session_state.selected_years_key = available_years
+            st.rerun()
+    with col2:
+        if st.button("Deselecionar Todos", key="deselect_all_years_btn"):
+            st.session_state.selected_years_key = []
+            st.rerun()
+    
     selected_years = st.sidebar.multiselect(
         "Selecionar Anos",
         options=available_years,
-        default=available_years,
-        help="Escolha quais anos incluir na análise"
+        default=st.session_state.selected_years_key,
+        help="Escolha quais anos incluir na análise",
+        key="years_multiselect"
     )
+    
+    # Update session state from widget
+    st.session_state.selected_years_key = selected_years
+    
+    # Persons filter with select all buttons
+    col3, col4 = st.sidebar.columns(2)
+    with col3:
+        if st.button("Selecionar Todos", key="select_all_persons_btn"):
+            st.session_state.selected_persons_key = available_persons
+            st.rerun()
+    with col4:
+        if st.button("Deselecionar Todos", key="deselect_all_persons_btn"):
+            st.session_state.selected_persons_key = []
+            st.rerun()
     
     selected_persons = st.sidebar.multiselect(
         "Selecionar Pessoas",
         options=available_persons,
-        default=available_persons,
-        help="Escolha quais pessoas incluir na análise"
+        default=st.session_state.selected_persons_key,
+        help="Escolha quais pessoas incluir na análise",
+        key="persons_multiselect"
     )
+    
+    # Update session state from widget
+    st.session_state.selected_persons_key = selected_persons
     
     # Filter data
     if not selected_years or not selected_persons:
@@ -437,6 +596,129 @@ def main():
     )
     fig_day.update_layout(height=400)
     st.plotly_chart(fig_day, use_container_width=True)
+    
+    # Weekday x Hour heatmap
+    st.subheader("Mapa de Calor: Dia da Semana x Hora do Dia")
+    filtered_df['hour'] = filtered_df['date'].dt.hour
+    
+    # Create heatmap data
+    heatmap_data = filtered_df.groupby(['day_name', 'hour']).size().reset_index(name='count')
+    
+    # Create pivot table for heatmap
+    heatmap_pivot = heatmap_data.pivot(index='day_name', columns='hour', values='count').fillna(0)
+    
+    # Reindex to ensure correct weekday order
+    heatmap_pivot = heatmap_pivot.reindex(day_names)
+    
+    # Create heatmap using plotly
+    fig_heatmap = go.Figure(data=go.Heatmap(
+        z=heatmap_pivot.values,
+        x=heatmap_pivot.columns,
+        y=heatmap_pivot.index,
+        colorscale='Viridis',
+        text=heatmap_pivot.values,
+        texttemplate='%{text:.0f}',
+        textfont={"size": 10},
+        colorbar=dict(title="Quantidade de Mensagens")
+    ))
+    
+    fig_heatmap.update_layout(
+        title='Mapa de Calor: Mensagens por Dia da Semana e Hora do Dia',
+        xaxis_title='Hora do Dia',
+        yaxis_title='Dia da Semana',
+        height=500
+    )
+    
+    st.plotly_chart(fig_heatmap, use_container_width=True)
+    
+    # Word cloud
+    st.subheader("Nuvem de Palavras")
+    wordcloud = generate_word_cloud(filtered_df)
+    if wordcloud:
+        fig_wc, ax = plt.subplots(figsize=(12, 6))
+        ax.imshow(wordcloud, interpolation='bilinear')
+        ax.axis('off')
+        st.pyplot(fig_wc)
+        plt.close(fig_wc)
+    else:
+        st.info("Não há palavras suficientes para gerar a nuvem de palavras.")
+    
+    # Most common word per hour/day
+    st.subheader("Palavra Mais Comum por Hora e Dia da Semana")
+    
+    common_words_df = get_most_common_word_per_hour_day(filtered_df)
+    
+    if not common_words_df.empty:
+        # Get all unique hours and ensure proper ordering
+        all_hours = sorted(common_words_df['hour'].unique())
+        
+        # Create pivot table for display
+        pivot_table = common_words_df.pivot(index='day_name', columns='hour', values='most_common_word')
+        pivot_table = pivot_table.reindex(day_names)
+        # Ensure all hours are in columns, fill missing with '-'
+        for hour in all_hours:
+            if hour not in pivot_table.columns:
+                pivot_table[hour] = '-'
+        pivot_table = pivot_table[sorted(pivot_table.columns)]
+        pivot_table = pivot_table.fillna('-')
+        
+        # Display as table
+        st.write("**Tabela: Palavra Mais Comum**")
+        display_table = pivot_table.copy()
+        display_table.index.name = 'Dia da Semana'
+        display_table.columns.name = 'Hora'
+        st.dataframe(display_table, use_container_width=True, height=300)
+        
+        # Create heatmap with word labels
+        st.write("**Mapa de Calor: Palavra Mais Comum**")
+        
+        # Create a numeric version for the heatmap (using word counts)
+        count_pivot = common_words_df.pivot(index='day_name', columns='hour', values='count')
+        count_pivot = count_pivot.reindex(day_names)
+        # Ensure all hours are in columns, fill missing with 0
+        for hour in all_hours:
+            if hour not in count_pivot.columns:
+                count_pivot[hour] = 0
+        count_pivot = count_pivot[sorted(count_pivot.columns)]
+        count_pivot = count_pivot.fillna(0)
+        
+        # Create custom text for each cell - align with pivot table structure
+        text_matrix = []
+        for day in day_names:
+            row_text = []
+            for hour in sorted(count_pivot.columns):
+                if day in pivot_table.index and hour in pivot_table.columns:
+                    word = pivot_table.loc[day, hour]
+                    if pd.notna(word) and word != '-':
+                        row_text.append(str(word))
+                    else:
+                        row_text.append("")
+                else:
+                    row_text.append("")
+            text_matrix.append(row_text)
+        
+        fig_word_heatmap = go.Figure(data=go.Heatmap(
+            z=count_pivot.values,
+            x=count_pivot.columns,
+            y=count_pivot.index,
+            colorscale='Viridis',
+            text=text_matrix,
+            texttemplate='%{text}',
+            textfont={"size": 9},
+            colorbar=dict(title="Frequência da Palavra"),
+            hovertemplate='Dia: %{y}<br>Hora: %{x}<br>Palavra: %{text}<br>Frequência: %{z}<extra></extra>'
+        ))
+        
+        fig_word_heatmap.update_layout(
+            title='Palavra Mais Comum por Dia da Semana e Hora do Dia',
+            xaxis_title='Hora do Dia',
+            yaxis_title='Dia da Semana',
+            height=500
+        )
+        
+        st.plotly_chart(fig_word_heatmap, use_container_width=True)
+    else:
+        st.info("Não há dados suficientes para analisar palavras por hora e dia.")
     
     # Total messages per person (pie chart)
     st.subheader("Total de Mensagens por Pessoa")
