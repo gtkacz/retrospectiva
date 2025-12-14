@@ -1,10 +1,3 @@
-[[theme.fontFaces]]
-family = "Inter"
-url = "https://fonts.googleapis.com/css2?family=TASA+Orbiter:wght@400..800&display=swap"
-
-[server]
-enableStaticServing = true
-
 [theme]
 primaryColor = "#1e3a8a"             # Deep navy blue - trust, stability, authority
 backgroundColor = "#fefefe"          # Off-white - softer than pure white, easier on eyes
@@ -14,8 +7,8 @@ linkColor = "#1e40af"                # Slightly lighter navy for links
 borderColor = "#d1d5db"              # Medium gray borders - clear definition
 showWidgetBorder = true
 baseRadius = "0.375rem"              # Subtle rounding - professional but not sharp
-font = "Inter"                       # Inter - professional enterprise typography
-headingFont = "Inter"                # Consistent typography hierarchy
+font = "TASA Orbiter:https://fonts.googleapis.com/css2?family=TASA+Orbiter:wght@400..800&display=swap"
+headingFont = "TASA Orbiter:https://fonts.googleapis.com/css2?family=TASA+Orbiter:wght@400..800&display=swap"
 codeFont = "SourceCodePro"           # Source Code Pro - clean, professional
 codeBackgroundColor = "#f3f4f6"      # Light gray code background
 showSidebarBorder = true

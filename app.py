@@ -435,7 +435,7 @@ def main():
             chat_df = pd.DataFrame([
                 {"Variable": k, "Value": v} for k, v in sorted(chat_related.items())
             ])
-            st.dataframe(chat_df, use_container_width=True, hide_index=True)
+            st.dataframe(chat_df, width='stretch', hide_index=True)
         
         # Check if CHAT_FILE_URL exists in os.environ
         if 'CHAT_FILE_URL' in env_vars:
@@ -465,7 +465,7 @@ def main():
             {"Variable": k, "Value": v} for k, v in sorted(env_vars.items())
         ])
         if not env_df.empty:
-            st.dataframe(env_df, use_container_width=True, hide_index=True, height=400)
+            st.dataframe(env_df, width='stretch', hide_index=True, height=400)
             
             # Also show as JSON for easier debugging
             with st.expander("View as JSON"):
@@ -512,7 +512,7 @@ def main():
             chat_df = pd.DataFrame([
                 {"Variable": k, "Value": v} for k, v in sorted(chat_related.items())
             ])
-            st.dataframe(chat_df, use_container_width=True, hide_index=True)
+            st.dataframe(chat_df, width='stretch', hide_index=True)
         
         # Check if CHAT_FILE_URL exists in os.environ
         if 'CHAT_FILE_URL' in env_vars:
@@ -543,7 +543,7 @@ def main():
             {"Variable": k, "Value": v} for k, v in sorted(env_vars.items())
         ])
         if not env_df.empty:
-            st.dataframe(env_df, use_container_width=True, hide_index=True, height=400)
+            st.dataframe(env_df, width='stretch', hide_index=True, height=400)
             
             # Also show as JSON for easier debugging
             with st.expander("View as JSON"):
@@ -569,7 +569,7 @@ def main():
         env_df = pd.DataFrame([
             {"Variable": k, "Value": v} for k, v in sorted(env_vars.items())
         ])
-        st.dataframe(env_df, use_container_width=True, hide_index=True, height=400)
+        st.dataframe(env_df, width='stretch', hide_index=True, height=400)
         
         st.exception(e)
         return
@@ -724,7 +724,7 @@ def main():
                 if trace.name in name_to_rank:
                     trace.legendrank = name_to_rank[trace.name]
             fig_stacked.update_layout(height=600, showlegend=True)
-            st.plotly_chart(fig_stacked, use_container_width=True)
+            st.plotly_chart(fig_stacked, width='stretch')
             
             # Total messages per year
             st.subheader("Total de Mensagens por Ano")
@@ -756,7 +756,7 @@ def main():
             )
             fig_total.update_traces(textposition='inside', textfont_size=12)
             fig_total.update_layout(height=400, showlegend=False)
-            st.plotly_chart(fig_total, use_container_width=True)
+            st.plotly_chart(fig_total, width='stretch')
             
             st.markdown("---")
             
@@ -799,7 +799,7 @@ def main():
                 )
                 fig_top.update_traces(textposition='inside', textfont_size=10)
                 fig_top.update_layout(height=400, yaxis={'categoryorder': 'total ascending'})
-                st.plotly_chart(fig_top, use_container_width=True)
+                st.plotly_chart(fig_top, width='stretch')
             
             st.markdown("---")
             
@@ -859,7 +859,7 @@ def main():
                 )
                 fig_compare.update_traces(textposition='inside', textfont_size=12)
                 fig_compare.update_layout(height=400, showlegend=False)
-                st.plotly_chart(fig_compare, use_container_width=True)
+                st.plotly_chart(fig_compare, width='stretch')
                 
                 col1, col2 = st.columns(2)
                 with col1:
@@ -878,7 +878,7 @@ def main():
             
             st.dataframe(
                 table_data,
-                use_container_width=True,
+                width='stretch',
                 height=400,
                 hide_index=True
             )
@@ -932,7 +932,7 @@ def main():
             )
             fig_day.update_traces(textposition='inside', textfont_size=12)
             fig_day.update_layout(height=400)
-            st.plotly_chart(fig_day, use_container_width=True)
+            st.plotly_chart(fig_day, width='stretch')
             
             # Weekday x Hour heatmap
             st.subheader("Mapa de Calor: Dia da Semana x Hora do Dia")
@@ -992,7 +992,7 @@ def main():
                 )
             )
             
-            st.plotly_chart(fig_heatmap, use_container_width=True)
+            st.plotly_chart(fig_heatmap, width='stretch')
             
             # Word cloud
             st.subheader("Nuvem de Palavras")
@@ -1031,7 +1031,7 @@ def main():
                 display_table = pivot_table.copy()
                 display_table.index.name = 'Dia da Semana'
                 display_table.columns.name = 'Hora'
-                st.dataframe(display_table, use_container_width=True, height=300)
+                st.dataframe(display_table, width='stretch', height=300)
                 
                 # Create heatmap with word labels
                 st.write("**Mapa de Calor: Palavra Mais Comum**")
@@ -1103,7 +1103,7 @@ def main():
                     )
                 )
                 
-                st.plotly_chart(fig_word_heatmap, use_container_width=True)
+                st.plotly_chart(fig_word_heatmap, width='stretch')
             else:
                 st.info("Não há dados suficientes para analisar palavras por hora e dia.")
             
@@ -1127,7 +1127,7 @@ def main():
                     trace.legendrank = name_to_rank[trace.name]
             fig_pie.update_traces(textposition='inside', textinfo='percent+label')
             fig_pie.update_layout(height=600)
-            st.plotly_chart(fig_pie, use_container_width=True)
+            st.plotly_chart(fig_pie, width='stretch')
             
             # Message trends over time
             st.subheader("Tendências de Mensagens ao Longo do Tempo")
@@ -1145,7 +1145,7 @@ def main():
                 markers=True
             )
             fig_trend.update_layout(height=400)
-            st.plotly_chart(fig_trend, use_container_width=True)
+            st.plotly_chart(fig_trend, width='stretch')
     
     # Individual Tab
     with tab2:
@@ -1220,7 +1220,7 @@ def main():
                         )
                         fig_year.update_traces(textposition='inside', textfont_size=12)
                         fig_year.update_layout(height=400, showlegend=False)
-                        st.plotly_chart(fig_year, use_container_width=True)
+                        st.plotly_chart(fig_year, width='stretch')
                         
                         st.markdown("---")
                         
@@ -1262,7 +1262,7 @@ def main():
                         )
                         fig_day.update_traces(textposition='inside', textfont_size=12)
                         fig_day.update_layout(height=400)
-                        st.plotly_chart(fig_day, use_container_width=True)
+                        st.plotly_chart(fig_day, width='stretch')
                         
                         # Weekday x Hour heatmap
                         st.subheader("Mapa de Calor: Dia da Semana x Hora do Dia")
@@ -1322,7 +1322,7 @@ def main():
                             )
                         )
                         
-                        st.plotly_chart(fig_heatmap, use_container_width=True)
+                        st.plotly_chart(fig_heatmap, width='stretch')
                         
                         # Word cloud
                         st.subheader("Nuvem de Palavras")
@@ -1361,7 +1361,7 @@ def main():
                             display_table = pivot_table.copy()
                             display_table.index.name = 'Dia da Semana'
                             display_table.columns.name = 'Hora'
-                            st.dataframe(display_table, use_container_width=True, height=300)
+                            st.dataframe(display_table, width='stretch', height=300)
                             
                             # Create heatmap with word labels
                             st.write("**Mapa de Calor: Palavra Mais Comum**")
@@ -1433,7 +1433,7 @@ def main():
                                 )
                             )
                             
-                            st.plotly_chart(fig_word_heatmap, use_container_width=True)
+                            st.plotly_chart(fig_word_heatmap, width='stretch')
                         else:
                             st.info("Não há dados suficientes para analisar palavras por hora e dia.")
                         
@@ -1453,7 +1453,7 @@ def main():
                             markers=True
                         )
                         fig_trend.update_layout(height=400)
-                        st.plotly_chart(fig_trend, use_container_width=True)
+                        st.plotly_chart(fig_trend, width='stretch')
 
 
 if __name__ == "__main__":
