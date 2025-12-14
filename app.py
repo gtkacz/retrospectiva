@@ -503,7 +503,7 @@ def main():
             # Create grouped data
             year_person_counts = filtered_df.groupby(['year', 'parsed_name']).size().reset_index(name='count')
             
-            # Stacked bar chart
+            # Stacked bar chart - create with original data order
             fig_stacked = px.bar(
                 year_person_counts,
                 x='year',
@@ -513,6 +513,12 @@ def main():
                 labels={'year': 'Ano', 'count': 'Número de Mensagens', 'parsed_name': 'Pessoa'},
                 barmode='stack'
             )
+            # Set legendrank for alphabetical legend order without changing trace/visual order
+            unique_names = sorted(year_person_counts['parsed_name'].unique())
+            name_to_rank = {name: i for i, name in enumerate(unique_names)}
+            for trace in fig_stacked.data:
+                if trace.name in name_to_rank:
+                    trace.legendrank = name_to_rank[trace.name]
             fig_stacked.update_layout(height=600, showlegend=True)
             st.plotly_chart(fig_stacked, use_container_width=True)
             
@@ -909,6 +915,12 @@ def main():
                 title='Distribuição de Mensagens por Pessoa',
                 hole=0.4
             )
+            # Set legendrank for alphabetical legend order without changing trace/visual order
+            unique_names = sorted(person_totals['Pessoa'].unique())
+            name_to_rank = {name: i for i, name in enumerate(unique_names)}
+            for trace in fig_pie.data:
+                if trace.name in name_to_rank:
+                    trace.legendrank = name_to_rank[trace.name]
             fig_pie.update_traces(textposition='inside', textinfo='percent+label')
             fig_pie.update_layout(height=600)
             st.plotly_chart(fig_pie, use_container_width=True)
