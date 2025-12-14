@@ -463,6 +463,11 @@ def main():
     st.subheader("Total de Mensagens por Ano")
     year_totals = filtered_df.groupby('year').size().reset_index(name='count')
     
+    # Calculate percentages
+    total_all_years = year_totals['count'].sum()
+    year_totals['percentage'] = (year_totals['count'] / total_all_years * 100) if total_all_years > 0 else 0
+    year_totals['text'] = year_totals['percentage'].apply(lambda x: f'{x:.1f}%')
+    
     fig_total = px.bar(
         year_totals,
         x='year',
@@ -470,8 +475,10 @@ def main():
         title='Total de Mensagens por Ano',
         labels={'year': 'Ano', 'count': 'Número de Mensagens'},
         color='count',
-        color_continuous_scale='viridis'
+        color_continuous_scale='viridis',
+        text='text'
     )
+    fig_total.update_traces(textposition='inside', textfont_size=12)
     fig_total.update_layout(height=400, showlegend=False)
     st.plotly_chart(fig_total, use_container_width=True)
     
@@ -488,6 +495,11 @@ def main():
         year_counts = year_data['parsed_name'].value_counts().head(10).reset_index()
         year_counts.columns = ['Person', 'Count']
         
+        # Calculate percentages
+        total_year = year_counts['Count'].sum()
+        year_counts['percentage'] = (year_counts['Count'] / total_year * 100) if total_year > 0 else 0
+        year_counts['text'] = year_counts['percentage'].apply(lambda x: f'{x:.1f}%')
+        
         st.subheader(year)
         fig_top = px.bar(
             year_counts,
@@ -497,8 +509,10 @@ def main():
             title=f'Top 10 Usuários Mais Ativos em {year}',
             labels={'Count': 'Número de Mensagens', 'Person': 'Pessoa'},
             color='Count',
-            color_continuous_scale='viridis'
+            color_continuous_scale='viridis',
+            text='text'
         )
+        fig_top.update_traces(textposition='inside', textfont_size=10)
         fig_top.update_layout(height=400, yaxis={'categoryorder': 'total ascending'})
         st.plotly_chart(fig_top, use_container_width=True)
     
@@ -521,25 +535,32 @@ def main():
         most_count = year_counts.max()
         least_count = year_counts.min()
         
+        # Calculate percentages
+        total_year = year_counts.sum()
+        most_percentage = (most_count / total_year * 100) if total_year > 0 else 0
+        least_percentage = (least_count / total_year * 100) if total_year > 0 else 0
+        
         st.subheader(year)
         
         comparison_data = pd.DataFrame({
             'Person': [most_active, least_active],
             'Count': [most_count, least_count],
-            'Type': ['Mais Ativo', 'Menos Ativo']
+            'Type': ['Mais Ativo', 'Menos Ativo'],
+            'Percentage': [most_percentage, least_percentage]
         })
+        comparison_data['text'] = comparison_data['Percentage'].apply(lambda x: f'{x:.1f}%')
         
         fig_compare = px.bar(
             comparison_data,
             x='Type',
             y='Count',
             color='Type',
-            text='Person',
+            text='text',
             title=f'Usuários Mais e Menos Ativos em {year}',
             labels={'Count': 'Número de Mensagens', 'Type': 'Categoria'},
             color_discrete_map={'Mais Ativo': '#571089', 'Menos Ativo': '#d55d92'}
         )
-        fig_compare.update_traces(textposition='outside')
+        fig_compare.update_traces(textposition='inside', textfont_size=12)
         fig_compare.update_layout(height=400, showlegend=False)
         st.plotly_chart(fig_compare, use_container_width=True)
         
@@ -588,6 +609,11 @@ def main():
     day_counts = filtered_df['day_name'].value_counts().reindex(day_names).reset_index()
     day_counts.columns = ['Dia da Semana', 'Contagem']
     
+    # Calculate percentages
+    total_days = day_counts['Contagem'].sum()
+    day_counts['percentage'] = (day_counts['Contagem'] / total_days * 100) if total_days > 0 else 0
+    day_counts['text'] = day_counts['percentage'].apply(lambda x: f'{x:.1f}%')
+    
     fig_day = px.bar(
         day_counts,
         x='Dia da Semana',
@@ -595,8 +621,10 @@ def main():
         title='Mensagens por Dia da Semana',
         labels={'Contagem': 'Número de Mensagens'},
         color='Contagem',
-        color_continuous_scale='viridis'
+        color_continuous_scale='viridis',
+        text='text'
     )
+    fig_day.update_traces(textposition='inside', textfont_size=12)
     fig_day.update_layout(height=400)
     st.plotly_chart(fig_day, use_container_width=True)
     
