@@ -280,6 +280,14 @@ def convert_to_percentage(pivot_df):
     return percentage_df
 
 
+def convert_to_percentage_per_week(pivot_df):
+    """Convert absolute values in pivot table to percentages relative to entire week."""
+    total_sum = pivot_df.sum().sum()
+    percentage_df = (pivot_df / total_sum * 100) if total_sum > 0 else pivot_df * 0
+    percentage_df = percentage_df.fillna(0)
+    return percentage_df
+
+
 def get_most_common_word_per_hour_day(df):
     """Find the most common word for each hour/day combination."""
     stopwords_set = get_stopwords()
@@ -428,6 +436,15 @@ def main():
     
     # Add percentage toggle in sidebar (for both heatmaps and bar graphs)
     use_percentage = st.sidebar.checkbox("Usar porcentagem nos gráficos", value=True, key="graph_percentage")
+    
+    # Add heatmap normalization mode toggle
+    heatmap_mode = st.sidebar.radio(
+        "Modo de Normalização do Mapa de Calor",
+        options=["Por Dia", "Por Semana"],
+        index=0,  # Default to "Por Dia"
+        help="Por Dia: cada célula é relativa ao seu dia da semana. Por Semana: cada célula é relativa à semana inteira.",
+        key="heatmap_mode"
+    )
     
     # Overview Metrics
     st.header("Métricas Gerais")
@@ -683,9 +700,19 @@ def main():
     # Reindex to ensure correct weekday order
     heatmap_pivot = heatmap_pivot.reindex(day_names)
     
+    # Ensure all 24 hours (0-23) are in columns, fill missing with 0
+    all_hours = list(range(24))
+    for hour in all_hours:
+        if hour not in heatmap_pivot.columns:
+            heatmap_pivot[hour] = 0
+    heatmap_pivot = heatmap_pivot[sorted(heatmap_pivot.columns)]
+    
     # Convert to percentage if toggle is enabled
     if use_percentage:
-        heatmap_pivot = convert_to_percentage(heatmap_pivot)
+        if heatmap_mode == "Por Semana":
+            heatmap_pivot = convert_to_percentage_per_week(heatmap_pivot)
+        else:
+            heatmap_pivot = convert_to_percentage(heatmap_pivot)
         colorbar_title = "Porcentagem de Mensagens"
         text_template = '%{text:.1f}%'
     else:
@@ -708,7 +735,14 @@ def main():
         title='Mapa de Calor: Mensagens por Dia da Semana e Hora do Dia',
         xaxis_title='Hora do Dia',
         yaxis_title='Dia da Semana',
-        height=500
+        height=500,
+        xaxis=dict(
+            tickmode='linear',
+            tick0=0,
+            dtick=1,
+            tickvals=list(range(24)),
+            ticktext=[str(h) for h in range(24)]
+        )
     )
     
     st.plotly_chart(fig_heatmap, use_container_width=True)
@@ -732,8 +766,8 @@ def main():
     common_words_df = get_most_common_word_per_hour_day(filtered_df)
     
     if not common_words_df.empty:
-        # Get all unique hours and ensure proper ordering
-        all_hours = sorted(common_words_df['hour'].unique())
+        # Ensure all 24 hours (0-23) are included
+        all_hours = list(range(24))
         
         # Create pivot table for display
         pivot_table = common_words_df.pivot(index='day_name', columns='hour', values='most_common_word')
@@ -767,7 +801,10 @@ def main():
         
         # Convert to percentage if toggle is enabled (reuse the same toggle)
         if use_percentage:
-            count_pivot = convert_to_percentage(count_pivot)
+            if heatmap_mode == "Por Semana":
+                count_pivot = convert_to_percentage_per_week(count_pivot)
+            else:
+                count_pivot = convert_to_percentage(count_pivot)
             colorbar_title = "Porcentagem da Frequência da Palavra"
         else:
             colorbar_title = "Frequência da Palavra"
@@ -809,7 +846,14 @@ def main():
             title='Palavra Mais Comum por Dia da Semana e Hora do Dia',
             xaxis_title='Hora do Dia',
             yaxis_title='Dia da Semana',
-            height=500
+            height=500,
+            xaxis=dict(
+                tickmode='linear',
+                tick0=0,
+                dtick=1,
+                tickvals=list(range(24)),
+                ticktext=[str(h) for h in range(24)]
+            )
         )
         
         st.plotly_chart(fig_word_heatmap, use_container_width=True)
