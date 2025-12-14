@@ -1,0 +1,8 @@
+streamlit
+plotly
+wordcloud
+matplotlib
+nltk
+pillow
+requests
+python-dotenv
