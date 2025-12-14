@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 import io
 import nltk
 from nltk.corpus import stopwords
+import requests
+from dotenv import load_dotenv
 
 # Download NLTK data (stopwords)
 try:
@@ -55,35 +57,38 @@ NAME_MAP = {
 
 @st.cache_data
 def load_and_parse_messages():
-    """Load and parse messages from _chat.txt file.
+    """Load and parse messages from _chat.txt file downloaded from URL.
     
     Returns:
         tuple: (DataFrame, set of unrecognized names)
     """
-    # Find the chat file - try current directory and script directory
-    script_dir = Path(__file__).parent
-    chat_file = script_dir / '_chat.txt'
+    # Load environment variables from .env file
+    load_dotenv()
     
-    # If file doesn't exist in script directory, try current working directory
-    if not chat_file.exists():
-        chat_file = Path('_chat.txt')
+    # Get the URL from environment variable
+    chat_file_url = os.getenv('CHAT_FILE_URL')
+    if not chat_file_url:
+        raise ValueError("CHAT_FILE_URL_NOT_SET")  # Special error code to trigger env display
     
-    # Load data
+    # Download the file from URL
     try:
-        with open(chat_file, 'r', encoding='latin-1') as f:
-            data_lines = f.readlines()
-    except FileNotFoundError:
-        raise FileNotFoundError(
-            f"Could not find '_chat.txt'. Tried:\n"
-            f"  - {script_dir / '_chat.txt'}\n"
-            f"  - {Path('_chat.txt').absolute()}\n"
-            f"Current working directory: {os.getcwd()}"
+        response = requests.get(chat_file_url, timeout=30)
+        response.raise_for_status()  # Raise an exception for bad status codes
+    except requests.exceptions.RequestException as e:
+        raise Exception(
+            f"Error downloading '_chat.txt' from URL '{chat_file_url}': {str(e)}\n"
+            f"Please check that the URL is correct and accessible."
         )
-    except Exception as e:
-        raise Exception(f"Error reading '_chat.txt': {str(e)}")
+    
+    # Decode the content using latin-1 encoding
+    try:
+        content = response.content.decode('latin-1')
+        data_lines = content.splitlines(keepends=True)
+    except UnicodeDecodeError as e:
+        raise Exception(f"Error decoding downloaded file content: {str(e)}")
     
     if not data_lines:
-        raise ValueError("The '_chat.txt' file is empty.")
+        raise ValueError("The downloaded '_chat.txt' file is empty.")
     
     # Filter valid messages using regex
     parsed_data = [item for item in data_lines if use_regex(item)]
@@ -355,18 +360,46 @@ def main():
     try:
         with st.spinner("Carregando e analisando mensagens..."):
             df, unrecognized_names = load_and_parse_messages()
-    except FileNotFoundError as e:
-        st.error(f"Arquivo não encontrado: {str(e)}")
-        st.info("Certifique-se de que '_chat.txt' está no mesmo diretório que app.py")
-        return
     except ValueError as e:
-        st.error(f"Erro ao analisar dados: {str(e)}")
-        with st.expander("Informações de Depuração"):
-            st.write("Isso pode ajudar a identificar o problema:")
-            st.code(str(e))
+        error_msg = str(e)
+        st.error(f"Erro ao carregar dados: {error_msg}")
+        st.info("Certifique-se de que a variável CHAT_FILE_URL está configurada no arquivo .env")
+        
+        # Always show environment variables for debugging
+        st.markdown("### Environment Variables")
+        env_vars = {k: v for k, v in os.environ.items()}
+        st.write(f"**Total environment variables found: {len(env_vars)}**")
+        
+        env_df = pd.DataFrame([
+            {"Variable": k, "Value": v} for k, v in sorted(env_vars.items())
+        ])
+        if not env_df.empty:
+            st.dataframe(env_df, use_container_width=True, hide_index=True, height=400)
+            
+            # Also show as JSON for easier debugging
+            with st.expander("View as JSON"):
+                import json
+                st.json(dict(sorted(env_vars.items())))
+        else:
+            st.warning("No environment variables found!")
+        
+        with st.expander("Debug - Error Details"):
+            st.write("Detalhes do erro:")
+            st.code(error_msg)
         return
     except Exception as e:
-        st.error(f"Erro inesperado: {str(e)}")
+        error_msg = str(e)
+        st.error(f"Erro ao baixar ou analisar dados: {error_msg}")
+        st.info("Verifique se a URL no arquivo .env está correta e acessível")
+        
+        # Show environment variables for any exception to help debug
+        st.subheader("Environment Variables (Debug)")
+        env_vars = {k: v for k, v in os.environ.items()}
+        env_df = pd.DataFrame([
+            {"Variable": k, "Value": v} for k, v in sorted(env_vars.items())
+        ])
+        st.dataframe(env_df, use_container_width=True, hide_index=True, height=400)
+        
         st.exception(e)
         return
     
@@ -382,8 +415,8 @@ def main():
     
     # Check if DataFrame is empty
     if df.empty:
-        st.error("Nenhum dado foi carregado. Por favor, verifique se '_chat.txt' existe e contém mensagens válidas.")
-        st.info("Informações de depuração: O arquivo pode estar vazio ou a lógica de análise pode precisar de ajuste.")
+        st.error("Nenhum dado foi carregado. Por favor, verifique se o arquivo baixado da URL contém mensagens válidas.")
+        st.info("Debug: O arquivo pode estar vazio ou a lógica de análise pode precisar de ajuste.")
         return
     
     # Get available years and persons (filter out NaN values)
@@ -393,7 +426,7 @@ def main():
     # Show debug info if no data
     if not available_years or not available_persons:
         st.error("Nenhum dado válido encontrado após a análise.")
-        with st.expander("Informações de Depuração"):
+        with st.expander("Debug"):
             st.write(f"Total de linhas após análise: {len(df)}")
             if len(df) > 0:
                 st.write("Dados de exemplo:")
