@@ -14,6 +14,9 @@ from nltk.corpus import stopwords
 import requests
 from dotenv import load_dotenv
 
+# Load environment variables from .env file at module startup
+load_dotenv()
+
 # Download NLTK data (stopwords)
 try:
     nltk.download('stopwords', quiet=True)
@@ -55,28 +58,69 @@ NAME_MAP = {
 }
 
 
+def convert_google_drive_url(url):
+    """Convert Google Drive sharing URL to direct download URL.
+    
+    Args:
+        url: Google Drive sharing URL (e.g., https://drive.google.com/file/d/FILE_ID/view?usp=sharing)
+    
+    Returns:
+        Direct download URL or original URL if not a Google Drive URL
+    """
+    import re
+    # Pattern to match Google Drive file URLs
+    pattern = r'https://drive\.google\.com/file/d/([a-zA-Z0-9_-]+)'
+    match = re.search(pattern, url)
+    if match:
+        file_id = match.group(1)
+        return f'https://drive.google.com/uc?export=download&id={file_id}'
+    return url
+
+
 @st.cache_data
-def load_and_parse_messages():
+def load_and_parse_messages(chat_file_url):
     """Load and parse messages from _chat.txt file downloaded from URL.
+    
+    Args:
+        chat_file_url: URL to download the chat file from
     
     Returns:
         tuple: (DataFrame, set of unrecognized names)
     """
-    # Load environment variables from .env file
-    load_dotenv()
-    
-    # Get the URL from environment variable
-    chat_file_url = os.getenv('CHAT_FILE_URL')
-    if not chat_file_url:
-        raise ValueError("CHAT_FILE_URL_NOT_SET")  # Special error code to trigger env display
+    # Convert Google Drive sharing URL to direct download URL if needed
+    download_url = convert_google_drive_url(chat_file_url)
     
     # Download the file from URL
     try:
-        response = requests.get(chat_file_url, timeout=30)
+        # Use a session to handle cookies (needed for Google Drive)
+        session = requests.Session()
+        response = session.get(download_url, timeout=30, allow_redirects=True)
         response.raise_for_status()  # Raise an exception for bad status codes
+        
+        # Check if we got HTML instead of the file (Google Drive sometimes returns HTML)
+        content_type = response.headers.get('Content-Type', '').lower()
+        if 'text/html' in content_type:
+            # If it's HTML, we might have hit a virus scan warning page
+            # Try to get the actual download link
+            if 'download' in response.text.lower() or 'virus' in response.text.lower():
+                # Extract the actual download link from the HTML
+                import re
+                download_match = re.search(r'href="(/uc\?export=download[^"]+)"', response.text)
+                if download_match:
+                    actual_url = 'https://drive.google.com' + download_match.group(1)
+                    response = session.get(actual_url, timeout=30, allow_redirects=True)
+                    response.raise_for_status()
+                else:
+                    raise Exception(
+                        f"Google Drive returned an HTML page instead of the file. "
+                        f"This might be a virus scan warning. Please try: "
+                        f"1. Right-click the file in Google Drive > Get link > Change to 'Anyone with the link' > Viewer\n"
+                        f"2. Or use the direct download URL format: https://drive.google.com/uc?export=download&id=FILE_ID"
+                    )
     except requests.exceptions.RequestException as e:
         raise Exception(
             f"Error downloading '_chat.txt' from URL '{chat_file_url}': {str(e)}\n"
+            f"Download URL used: '{download_url}'\n"
             f"Please check that the URL is correct and accessible."
         )
     
@@ -356,18 +400,143 @@ def main():
     st.title("Retrospectiva Grupo Camburou")
     st.markdown("---")
     
+    # Read CHAT_FILE_URL from environment variable (outside cached function)
+    chat_file_url = os.getenv('CHAT_FILE_URL', '').strip()
+    
+    # Check if URL is set before calling cached function
+    if not chat_file_url:
+        st.error("CHAT_FILE_URL environment variable is not set.")
+        st.info("Certifique-se de que a variável CHAT_FILE_URL está configurada no arquivo .env")
+        
+        # Show debugging information
+        st.markdown("### CHAT_FILE_URL Debugging")
+        chat_file_url_value = os.getenv('CHAT_FILE_URL')
+        chat_file_url_stripped = os.getenv('CHAT_FILE_URL', '').strip()
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**os.getenv('CHAT_FILE_URL'):**")
+            if chat_file_url_value is None:
+                st.error(f"`None` (not found)")
+            else:
+                st.success(f"`{repr(chat_file_url_value)}`")
+        with col2:
+            st.write("**After .strip():**")
+            if not chat_file_url_stripped:
+                st.error(f"`{repr(chat_file_url_stripped)}` (empty after strip)")
+            else:
+                st.success(f"`{repr(chat_file_url_stripped)}`")
+        
+        # Check for related environment variables
+        env_vars = {k: v for k, v in os.environ.items()}
+        chat_related = {k: v for k, v in env_vars.items() if 'CHAT' in k.upper() or 'URL' in k.upper()}
+        if chat_related:
+            st.write("**Environment variables containing 'CHAT' or 'URL':**")
+            chat_df = pd.DataFrame([
+                {"Variable": k, "Value": v} for k, v in sorted(chat_related.items())
+            ])
+            st.dataframe(chat_df, use_container_width=True, hide_index=True)
+        
+        # Check if CHAT_FILE_URL exists in os.environ
+        if 'CHAT_FILE_URL' in env_vars:
+            st.success(f"**Found in os.environ:** `CHAT_FILE_URL` = `{repr(env_vars['CHAT_FILE_URL'])}`")
+            if chat_file_url_value is None:
+                st.warning("💡 **Issue:** The variable exists in os.environ but `os.getenv('CHAT_FILE_URL')` returned `None`. This is likely a Streamlit caching issue.")
+                st.info("**Solution:** Try clearing the Streamlit cache (Settings > Clear cache) or restarting the Streamlit server.")
+            elif not chat_file_url_stripped:
+                st.warning("💡 **Issue:** The variable exists but is empty or contains only whitespace after stripping.")
+        else:
+            # Check for case-insensitive match
+            chat_file_url_variants = {k: v for k, v in env_vars.items() if k.upper() == 'CHAT_FILE_URL'}
+            if chat_file_url_variants:
+                variant_key = list(chat_file_url_variants.keys())[0]
+                st.warning(f"**Found in os.environ with different case:** `{variant_key}` = `{repr(chat_file_url_variants[variant_key])}`")
+                st.info("💡 **Tip:** Environment variable names are case-sensitive. Make sure your .env file uses exactly `CHAT_FILE_URL` (all uppercase).")
+            else:
+                st.error("**CHAT_FILE_URL not found in os.environ at all.**")
+        
+        st.markdown("---")
+        
+        # Always show all environment variables for debugging
+        st.markdown("### All Environment Variables")
+        st.write(f"**Total environment variables found: {len(env_vars)}**")
+        
+        env_df = pd.DataFrame([
+            {"Variable": k, "Value": v} for k, v in sorted(env_vars.items())
+        ])
+        if not env_df.empty:
+            st.dataframe(env_df, use_container_width=True, hide_index=True, height=400)
+            
+            # Also show as JSON for easier debugging
+            with st.expander("View as JSON"):
+                import json
+                st.json(dict(sorted(env_vars.items())))
+        else:
+            st.warning("No environment variables found!")
+        
+        return
+    
     # Load data
     try:
         with st.spinner("Carregando e analisando mensagens..."):
-            df, unrecognized_names = load_and_parse_messages()
+            df, unrecognized_names = load_and_parse_messages(chat_file_url)
     except ValueError as e:
         error_msg = str(e)
         st.error(f"Erro ao carregar dados: {error_msg}")
         st.info("Certifique-se de que a variável CHAT_FILE_URL está configurada no arquivo .env")
         
-        # Always show environment variables for debugging
-        st.markdown("### Environment Variables")
+        # Specific debugging for CHAT_FILE_URL
+        st.markdown("### CHAT_FILE_URL Debugging")
+        chat_file_url_value = os.getenv('CHAT_FILE_URL')
+        chat_file_url_stripped = os.getenv('CHAT_FILE_URL', '').strip()
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**os.getenv('CHAT_FILE_URL'):**")
+            if chat_file_url_value is None:
+                st.error(f"`None` (not found)")
+            else:
+                st.success(f"`{repr(chat_file_url_value)}`")
+        with col2:
+            st.write("**After .strip():**")
+            if not chat_file_url_stripped:
+                st.error(f"`{repr(chat_file_url_stripped)}` (empty after strip)")
+            else:
+                st.success(f"`{repr(chat_file_url_stripped)}`")
+        
+        # Check for related environment variables
         env_vars = {k: v for k, v in os.environ.items()}
+        chat_related = {k: v for k, v in env_vars.items() if 'CHAT' in k.upper() or 'URL' in k.upper()}
+        if chat_related:
+            st.write("**Environment variables containing 'CHAT' or 'URL':**")
+            chat_df = pd.DataFrame([
+                {"Variable": k, "Value": v} for k, v in sorted(chat_related.items())
+            ])
+            st.dataframe(chat_df, use_container_width=True, hide_index=True)
+        
+        # Check if CHAT_FILE_URL exists in os.environ
+        if 'CHAT_FILE_URL' in env_vars:
+            # Exact case match found
+            st.success(f"**Found in os.environ:** `CHAT_FILE_URL` = `{repr(env_vars['CHAT_FILE_URL'])}`")
+            if chat_file_url_value is None:
+                st.warning("💡 **Issue:** The variable exists in os.environ but `os.getenv('CHAT_FILE_URL')` returned `None`. This is likely a Streamlit caching issue.")
+                st.info("**Solution:** Try clearing the Streamlit cache (Settings > Clear cache) or restarting the Streamlit server.")
+            elif not chat_file_url_stripped:
+                st.warning("💡 **Issue:** The variable exists but is empty or contains only whitespace after stripping.")
+        else:
+            # Check for case-insensitive match
+            chat_file_url_variants = {k: v for k, v in env_vars.items() if k.upper() == 'CHAT_FILE_URL'}
+            if chat_file_url_variants:
+                variant_key = list(chat_file_url_variants.keys())[0]
+                st.warning(f"**Found in os.environ with different case:** `{variant_key}` = `{repr(chat_file_url_variants[variant_key])}`")
+                st.info("💡 **Tip:** Environment variable names are case-sensitive. Make sure your .env file uses exactly `CHAT_FILE_URL` (all uppercase).")
+            else:
+                st.error("**CHAT_FILE_URL not found in os.environ at all.**")
+        
+        st.markdown("---")
+        
+        # Always show all environment variables for debugging
+        st.markdown("### All Environment Variables")
         st.write(f"**Total environment variables found: {len(env_vars)}**")
         
         env_df = pd.DataFrame([
@@ -386,6 +555,8 @@ def main():
         with st.expander("Debug - Error Details"):
             st.write("Detalhes do erro:")
             st.code(error_msg)
+            st.write("**Note:** If CHAT_FILE_URL appears in the environment variables table above but os.getenv() returns None, this is likely a Streamlit caching issue. Try:")
+            st.code("1. Clear Streamlit cache: Settings > Clear cache\n2. Restart the Streamlit server\n3. Check that .env file is in the correct location")
         return
     except Exception as e:
         error_msg = str(e)
