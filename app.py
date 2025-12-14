@@ -1,0 +1,477 @@
+import re
+import os
+import pandas as pd
+import streamlit as st
+import plotly.express as px
+from datetime import datetime
+from pathlib import Path
+
+# Page configuration
+st.set_page_config(
+    page_title="WhatsApp Chat Analysis",
+    page_icon="💬",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Name mapping dictionary (from notebook cell 10)
+NAME_MAP = {
+    'Alexandre Sadaka': ['Arex'],
+    'Andre Stolar': ['Deco Stolar'],
+    'Bruno Menache': ['Bruno Menache'],
+    'Bruno Stisin': ['Bruno Stisin', r'â\x80\x8eVocÃª'],
+    'Bruno Skorkowski': ['Bubis'],
+    'David Cohen': ['David Cohen'],
+    'Daniel Farina': ['Dummyts', r'~â\x80¯Daniel Turkie Farina'],
+    'Felipe Getz': ['Getzinho'],
+    'Ariel Hacham': ['Hacham'],
+    'Leonardo Mandelbaum': ['Leo Mandelbaum'],
+    'Daniel Mesnik': ['Mesnik'],
+    'Paulo Sutiak': ['Paulo Sutiak'],
+    'Rafael Thalenberg': ['Rafael Thalenberg'],
+    'Raphael Ulrych': ['Raphael Ulrych'],
+    'Ricardo Breinis': ['Ricardo Breinis'],
+    'Tiago Hudler': ['Ticaega'],
+    'Gabriel Tkacz': ['Tkacz'],
+    'William Gottesmann': ['William', r'~â\x80¯William'],
+    'Yuri Marchette': ['Yuri'],
+}
+
+
+@st.cache_data
+def load_and_parse_messages():
+    """Load and parse messages from _chat.txt file."""
+    # Find the chat file - try current directory and script directory
+    script_dir = Path(__file__).parent
+    chat_file = script_dir / '_chat.txt'
+    
+    # If file doesn't exist in script directory, try current working directory
+    if not chat_file.exists():
+        chat_file = Path('_chat.txt')
+    
+    # Load data
+    try:
+        with open(chat_file, 'r', encoding='latin-1') as f:
+            data_lines = f.readlines()
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"Could not find '_chat.txt'. Tried:\n"
+            f"  - {script_dir / '_chat.txt'}\n"
+            f"  - {Path('_chat.txt').absolute()}\n"
+            f"Current working directory: {os.getcwd()}"
+        )
+    except Exception as e:
+        raise Exception(f"Error reading '_chat.txt': {str(e)}")
+    
+    if not data_lines:
+        raise ValueError("The '_chat.txt' file is empty.")
+    
+    # Filter valid messages using regex
+    parsed_data = [item for item in data_lines if use_regex(item)]
+    
+    if not parsed_data:
+        raise ValueError("No valid messages found matching the expected format.")
+    
+    # Parse into DataFrame
+    raw_df_data = {'date': [], 'raw_name': [], 'parsed_name': [], 'raw_message': []}
+    
+    for item in parsed_data:
+        try:
+            # Find the closing bracket of the date
+            bracket_end = item.find(']')
+            if bracket_end == -1:
+                continue
+            
+            # Extract date: everything between [ and ]
+            date_str = item[1:bracket_end]
+            
+            # Extract name: everything after ] and before the first :
+            name_part = item[bracket_end + 1:].split(':', 1)
+            if len(name_part) < 2:
+                continue
+            
+            raw_name = name_part[0].strip()
+            parsed_name = parse_name(raw_name)
+            
+            raw_df_data['date'].append(date_str)
+            raw_df_data['raw_name'].append(raw_name)
+            raw_df_data['parsed_name'].append(parsed_name)
+            raw_df_data['raw_message'].append(item)
+        except (IndexError, ValueError, AttributeError):
+            # Skip malformed lines
+            continue
+    
+    # Create DataFrame
+    if not raw_df_data['date']:
+        raise ValueError("No messages could be parsed from the file.")
+    
+    df = pd.DataFrame(raw_df_data)
+    # Match notebook exactly: replace \n with empty string (not regex pattern)
+    df['raw_message'] = df['raw_message'].str.replace(r'\n', '', regex=True)
+    
+    # Filter unwanted messages (same order as notebook)
+    df = df.drop(df[df.apply(should_drop, axis=1)].index)
+    df = df[df['parsed_name'].notna()]
+    
+    if df.empty:
+        # Provide more debugging info
+        debug_info = {
+            'total_parsed': len(parsed_data),
+            'total_after_parsing': len(raw_df_data['date']),
+            'unique_raw_names': len(set(raw_df_data['raw_name'])),
+            'sample_raw_names': list(set(raw_df_data['raw_name']))[:10]
+        }
+        raise ValueError(
+            f"All messages were filtered out. Check name mapping and filter logic.\n"
+            f"Debug: {debug_info}"
+        )
+    
+    # Convert date - match notebook format exactly (notebook uses space, but actual string has comma)
+    # Replace comma with space to match notebook format string
+    df['date'] = df['date'].str.replace(', ', ' ', regex=False)
+    df['date'] = pd.to_datetime(df['date'], format='%d/%m/%Y %H:%M:%S', errors='coerce')
+    df = df.dropna(subset=['date'])
+    
+    if df.empty:
+        raise ValueError("All dates failed to parse. Check date format.")
+    
+    # Parse message content - match notebook exactly (uses .str[3], not [3:])
+    df['parsed_message'] = df['raw_message'].str.split(':').str[3].str.strip()
+    df['parsed_message'] = df['parsed_message'].str.encode('latin-1', errors='ignore').str.decode('utf-8', errors='ignore')
+    df['parsed_message'] = df['parsed_message'].str.upper()
+    
+    # Extract year
+    df['year'] = pd.DatetimeIndex(df['date']).year
+    
+    return df
+
+
+def use_regex(input_text):
+    """Check if input text matches the message pattern."""
+    pattern = re.compile(r"\[[^\]]*\]", re.IGNORECASE)
+    return pattern.match(input_text)
+
+
+def should_drop(row):
+    """Determine if a message should be dropped."""
+    input_text = row['raw_message']
+    return not((input_text != '.') and 
+               (not re.match(r'.*[Kk]{2,}\Z', input_text)) and 
+               (not re.match(r'(?i).*haha+.*', input_text)))
+
+
+def parse_name(raw_name):
+    """Map raw name to normalized name."""
+    for key, value in NAME_MAP.items():
+        if raw_name in value:
+            return key
+    return None
+
+
+def filter_data(df, selected_years, selected_persons):
+    """Filter DataFrame based on selected years and persons."""
+    filtered_df = df.copy()
+    
+    if selected_years:
+        filtered_df = filtered_df[filtered_df['year'].isin(selected_years)]
+    
+    if selected_persons:
+        filtered_df = filtered_df[filtered_df['parsed_name'].isin(selected_persons)]
+    
+    return filtered_df
+
+
+def calculate_metrics(df):
+    """Calculate overview metrics."""
+    total_messages = len(df)
+    unique_participants = df['parsed_name'].nunique()
+    avg_messages_per_person = total_messages / unique_participants if unique_participants > 0 else 0
+    
+    return {
+        'total_messages': total_messages,
+        'unique_participants': unique_participants,
+        'avg_messages_per_person': avg_messages_per_person
+    }
+
+
+def main():
+    st.title("💬 WhatsApp Chat Analysis - Per Year")
+    st.markdown("---")
+    
+    # Load data
+    try:
+        with st.spinner("Loading and parsing messages..."):
+            df = load_and_parse_messages()
+    except FileNotFoundError as e:
+        st.error(f"❌ File not found: {str(e)}")
+        st.info("💡 Make sure '_chat.txt' is in the same directory as app.py")
+        return
+    except ValueError as e:
+        st.error(f"❌ Data parsing error: {str(e)}")
+        with st.expander("🔍 Debug Information"):
+            st.write("This might help identify the issue:")
+            st.code(str(e))
+        return
+    except Exception as e:
+        st.error(f"❌ Unexpected error: {str(e)}")
+        st.exception(e)
+        return
+    
+    # Check if DataFrame is empty
+    if df.empty:
+        st.error("❌ No data was loaded. Please check that '_chat.txt' exists and contains valid messages.")
+        st.info("💡 Debug info: The file might be empty or the parsing logic might need adjustment.")
+        return
+    
+    # Get available years and persons (filter out NaN values)
+    available_years = sorted([y for y in df['year'].unique().tolist() if pd.notna(y)]) if not df.empty else []
+    available_persons = sorted([p for p in df['parsed_name'].unique().tolist() if pd.notna(p)]) if not df.empty else []
+    
+    # Show debug info if no data
+    if not available_years or not available_persons:
+        st.error("❌ No valid data found after parsing.")
+        with st.expander("🔍 Debug Information"):
+            st.write(f"Total rows after parsing: {len(df)}")
+            if len(df) > 0:
+                st.write("Sample data:")
+                st.dataframe(df.head())
+            st.write("Raw name counts:")
+            if 'raw_name' in df.columns:
+                st.write(df['raw_name'].value_counts())
+        return
+    
+    # Sidebar filters
+    st.sidebar.header("🔍 Filters")
+    
+    selected_years = st.sidebar.multiselect(
+        "Select Years",
+        options=available_years,
+        default=available_years,
+        help="Choose which years to include in the analysis"
+    )
+    
+    selected_persons = st.sidebar.multiselect(
+        "Select Persons",
+        options=available_persons,
+        default=available_persons,
+        help="Choose which persons to include in the analysis"
+    )
+    
+    # Filter data
+    if not selected_years or not selected_persons:
+        st.warning("⚠️ Please select at least one year and one person to view the analysis.")
+        return
+    
+    filtered_df = filter_data(df, selected_years, selected_persons)
+    
+    # Overview Metrics
+    st.header("📊 Overview Metrics")
+    metrics = calculate_metrics(filtered_df)
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Messages", f"{metrics['total_messages']:,}")
+    with col2:
+        st.metric("Unique Participants", metrics['unique_participants'])
+    with col3:
+        st.metric("Avg Messages per Person", f"{metrics['avg_messages_per_person']:,.1f}")
+    
+    st.markdown("---")
+    
+    # Per-year message counts per person
+    st.header("📈 Messages per Person per Year")
+    
+    # Create grouped data
+    year_person_counts = filtered_df.groupby(['year', 'parsed_name']).size().reset_index(name='count')
+    
+    # Stacked bar chart
+    fig_stacked = px.bar(
+        year_person_counts,
+        x='year',
+        y='count',
+        color='parsed_name',
+        title='Messages per Person per Year (Stacked)',
+        labels={'year': 'Year', 'count': 'Number of Messages', 'parsed_name': 'Person'},
+        barmode='stack'
+    )
+    fig_stacked.update_layout(height=600, showlegend=True)
+    st.plotly_chart(fig_stacked, use_container_width=True)
+    
+    # Total messages per year
+    st.subheader("Total Messages per Year")
+    year_totals = filtered_df.groupby('year').size().reset_index(name='count')
+    
+    fig_total = px.bar(
+        year_totals,
+        x='year',
+        y='count',
+        title='Total Messages per Year',
+        labels={'year': 'Year', 'count': 'Number of Messages'},
+        color='count',
+        color_continuous_scale='viridis'
+    )
+    fig_total.update_layout(height=400, showlegend=False)
+    st.plotly_chart(fig_total, use_container_width=True)
+    
+    st.markdown("---")
+    
+    # Top users per year
+    st.header("🏆 Top 10 Users per Year")
+    
+    for year in sorted(selected_years):
+        year_data = filtered_df[filtered_df['year'] == year]
+        if len(year_data) == 0:
+            continue
+        
+        year_counts = year_data['parsed_name'].value_counts().head(10).reset_index()
+        year_counts.columns = ['Person', 'Count']
+        
+        st.subheader(f"Year {year}")
+        fig_top = px.bar(
+            year_counts,
+            x='Count',
+            y='Person',
+            orientation='h',
+            title=f'Top 10 Most Active Users in {year}',
+            labels={'Count': 'Number of Messages', 'Person': 'Person'},
+            color='Count',
+            color_continuous_scale='viridis'
+        )
+        fig_top.update_layout(height=400, yaxis={'categoryorder': 'total ascending'})
+        st.plotly_chart(fig_top, use_container_width=True)
+    
+    st.markdown("---")
+    
+    # Most/Least active comparison per year
+    st.header("⚖️ Most vs Least Active per Year")
+    
+    for year in sorted(selected_years):
+        year_data = filtered_df[filtered_df['year'] == year]
+        if len(year_data) == 0:
+            continue
+        
+        year_counts = year_data['parsed_name'].value_counts()
+        if len(year_counts) == 0:
+            continue
+        
+        most_active = year_counts.idxmax()
+        least_active = year_counts.idxmin()
+        most_count = year_counts.max()
+        least_count = year_counts.min()
+        
+        st.subheader(f"Year {year}")
+        
+        comparison_data = pd.DataFrame({
+            'Person': [most_active, least_active],
+            'Count': [most_count, least_count],
+            'Type': ['Most Active', 'Least Active']
+        })
+        
+        fig_compare = px.bar(
+            comparison_data,
+            x='Type',
+            y='Count',
+            color='Type',
+            text='Person',
+            title=f'Most and Least Active Users in {year}',
+            labels={'Count': 'Number of Messages', 'Type': 'Category'},
+            color_discrete_map={'Most Active': '#571089', 'Least Active': '#d55d92'}
+        )
+        fig_compare.update_traces(textposition='outside')
+        fig_compare.update_layout(height=400, showlegend=False)
+        st.plotly_chart(fig_compare, use_container_width=True)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info(f"**Most Active:** {most_active} ({most_count:,} messages)")
+        with col2:
+            st.info(f"**Least Active:** {least_active} ({least_count:,} messages)")
+    
+    st.markdown("---")
+    
+    # Interactive data table
+    st.header("📋 Message Counts per Person per Year")
+    
+    table_data = filtered_df.groupby(['year', 'parsed_name']).size().reset_index(name='count')
+    table_data = table_data.sort_values(['year', 'count'], ascending=[True, False])
+    table_data.columns = ['Year', 'Person', 'Message Count']
+    
+    st.dataframe(
+        table_data,
+        use_container_width=True,
+        height=400,
+        hide_index=True
+    )
+    
+    # Download button
+    csv = table_data.to_csv(index=False)
+    st.download_button(
+        label="📥 Download data as CSV",
+        data=csv,
+        file_name=f"whatsapp_analysis_{datetime.now().strftime('%Y%m%d')}.csv",
+        mime="text/csv"
+    )
+    
+    st.markdown("---")
+    
+    # Additional analyses
+    st.header("📅 Additional Analyses")
+    
+    # Messages per day of week
+    st.subheader("Messages per Day of Week")
+    filtered_df['day_of_week'] = filtered_df['date'].dt.dayofweek
+    day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    filtered_df['day_name'] = filtered_df['day_of_week'].map(lambda x: day_names[x])
+    
+    day_counts = filtered_df['day_name'].value_counts().reindex(day_names).reset_index()
+    day_counts.columns = ['Day of Week', 'Count']
+    
+    fig_day = px.bar(
+        day_counts,
+        x='Day of Week',
+        y='Count',
+        title='Messages per Day of Week',
+        labels={'Count': 'Number of Messages'},
+        color='Count',
+        color_continuous_scale='viridis'
+    )
+    fig_day.update_layout(height=400)
+    st.plotly_chart(fig_day, use_container_width=True)
+    
+    # Total messages per person (pie chart)
+    st.subheader("Total Messages per Person")
+    person_totals = filtered_df['parsed_name'].value_counts().reset_index()
+    person_totals.columns = ['Person', 'Count']
+    
+    fig_pie = px.pie(
+        person_totals,
+        values='Count',
+        names='Person',
+        title='Distribution of Messages by Person',
+        hole=0.4
+    )
+    fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+    fig_pie.update_layout(height=600)
+    st.plotly_chart(fig_pie, use_container_width=True)
+    
+    # Message trends over time
+    st.subheader("Message Trends Over Time")
+    filtered_df['date_only'] = filtered_df['date'].dt.date
+    daily_counts = filtered_df.groupby('date_only').size().reset_index(name='count')
+    daily_counts.columns = ['Date', 'Count']
+    
+    fig_trend = px.line(
+        daily_counts,
+        x='Date',
+        y='Count',
+        title='Message Count Trend Over Time',
+        labels={'Count': 'Number of Messages', 'Date': 'Date'},
+        markers=True
+    )
+    fig_trend.update_layout(height=400)
+    st.plotly_chart(fig_trend, use_container_width=True)
+
+
+if __name__ == "__main__":
+    main()
+
