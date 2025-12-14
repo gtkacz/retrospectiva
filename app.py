@@ -31,10 +31,10 @@ NAME_MAP = {
     'Alexandre Sadaka': ['Arex'],
     'Andre Stolar': ['Deco Stolar'],
     'Bruno Menache': ['Bruno Menache'],
-    'Bruno Stisin': ['Bruno Stisin', r'â\x80\x8eVocÃª'],
-    'Bruno Skorkowski': ['Bubis'],
+    'Bruno Stisin': ['Bruno Stisin', r'â\x80\x8eVocÃª', r'âVocÃª'],
+    'Bruno Skorkowski': ['Bubis', 'Bruno Skorkowski'],
     'David Cohen': ['David Cohen'],
-    'Daniel Farina': ['Dummyts', r'~â\x80¯Daniel Turkie Farina'],
+    'Daniel Farina': ['Dummyts', r'~â\x80¯Daniel Turkie Farina', 'Dani Faras'],
     'Felipe Getz': ['Getzinho'],
     'Ariel Hacham': ['Hacham'],
     'Leonardo Mandelbaum': ['Leo Mandelbaum'],
@@ -45,14 +45,21 @@ NAME_MAP = {
     'Ricardo Breinis': ['Ricardo Breinis'],
     'Tiago Hudler': ['Ticaega'],
     'Gabriel Tkacz': ['Tkacz'],
-    'William Gottesmann': ['William', r'~â\x80¯William'],
+    'William Gottesmann': ['William', r'~â\x80¯William', r'~â¯William'],
     'Yuri Marchette': ['Yuri'],
+    'Leon Grimberg': ['Leon Grimberg'],
+    'Rafael Turecki': ['Turecki'],
+    'IGNORE': ['', 'Meta AI', 'PDA - Camburou - DPA'],
 }
 
 
 @st.cache_data
 def load_and_parse_messages():
-    """Load and parse messages from _chat.txt file."""
+    """Load and parse messages from _chat.txt file.
+    
+    Returns:
+        tuple: (DataFrame, set of unrecognized names)
+    """
     # Find the chat file - try current directory and script directory
     script_dir = Path(__file__).parent
     chat_file = script_dir / '_chat.txt'
@@ -86,6 +93,7 @@ def load_and_parse_messages():
     
     # Parse into DataFrame
     raw_df_data = {'date': [], 'raw_name': [], 'parsed_name': [], 'raw_message': []}
+    unrecognized_names = set()
     
     for item in parsed_data:
         try:
@@ -104,6 +112,10 @@ def load_and_parse_messages():
             
             raw_name = name_part[0].strip()
             parsed_name = parse_name(raw_name)
+            
+            # Track unrecognized names
+            if parsed_name is None:
+                unrecognized_names.add(raw_name)
             
             raw_df_data['date'].append(date_str)
             raw_df_data['raw_name'].append(raw_name)
@@ -155,7 +167,7 @@ def load_and_parse_messages():
     # Extract year
     df['year'] = pd.DatetimeIndex(df['date']).year
     
-    return df
+    return df, unrecognized_names
 
 
 def use_regex(input_text):
@@ -335,7 +347,7 @@ def main():
     # Load data
     try:
         with st.spinner("Carregando e analisando mensagens..."):
-            df = load_and_parse_messages()
+            df, unrecognized_names = load_and_parse_messages()
     except FileNotFoundError as e:
         st.error(f"Arquivo não encontrado: {str(e)}")
         st.info("Certifique-se de que '_chat.txt' está no mesmo diretório que app.py")
@@ -350,6 +362,16 @@ def main():
         st.error(f"Erro inesperado: {str(e)}")
         st.exception(e)
         return
+    
+    # Display alert modal for unrecognized names
+    if unrecognized_names:
+        with st.container():
+            st.error("⚠️ **Atenção: Mensagens com nomes não reconhecidos encontradas**")
+            st.markdown(f"**{len(unrecognized_names)} nome(s) não reconhecido(s) encontrado(s):**")
+            for name in sorted(unrecognized_names):
+                st.markdown(f"- {name}")
+            st.markdown("Essas mensagens foram excluídas da análise. Considere adicionar esses nomes ao mapeamento de nomes (NAME_MAP) no código.")
+            st.markdown("---")
     
     # Check if DataFrame is empty
     if df.empty:
