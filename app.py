@@ -274,6 +274,98 @@ def calculate_metrics(df):
     }
 
 
+def group_by_time_period(df, period_type):
+    """Group messages by different time periods.
+    
+    Args:
+        df: DataFrame with 'date' column
+        period_type: One of 'month', 'trimester', 'quarter', 'semester'
+    
+    Returns:
+        DataFrame with 'period' and 'count' columns, sorted chronologically
+    """
+    df_copy = df.copy()
+    
+    if period_type == 'month':
+        # Group by year-month
+        df_copy['period'] = df_copy['date'].dt.to_period('M')
+        period_counts = df_copy.groupby('period').size().reset_index(name='count')
+        period_counts['period'] = period_counts['period'].astype(str)
+        
+    elif period_type == 'trimester':
+        # Group by 4-month periods: Jan-Apr (T1), May-Aug (T2), Sep-Dec (T3)
+        def get_trimester(date):
+            month = date.month
+            year = date.year
+            if month <= 4:
+                return f"{year} T1"
+            elif month <= 8:
+                return f"{year} T2"
+            else:
+                return f"{year} T3"
+        
+        df_copy['period'] = df_copy['date'].apply(get_trimester)
+        period_counts = df_copy.groupby('period').size().reset_index(name='count')
+        
+    elif period_type == 'quarter':
+        # Group by 3-month quarters: Q1 (Jan-Mar), Q2 (Apr-Jun), Q3 (Jul-Sep), Q4 (Oct-Dec)
+        df_copy['period'] = df_copy['date'].dt.to_period('Q')
+        period_counts = df_copy.groupby('period').size().reset_index(name='count')
+        # Format as "2024 Q1" instead of "2024Q1"
+        period_counts['period'] = period_counts['period'].astype(str).str.replace('Q', ' Q')
+        
+    elif period_type == 'semester':
+        # Group by 6-month periods: Jan-Jun (S1), Jul-Dec (S2)
+        def get_semester(date):
+            month = date.month
+            year = date.year
+            if month <= 6:
+                return f"{year} S1"
+            else:
+                return f"{year} S2"
+        
+        df_copy['period'] = df_copy['date'].apply(get_semester)
+        period_counts = df_copy.groupby('period').size().reset_index(name='count')
+        
+    else:
+        raise ValueError(f"Unknown period_type: {period_type}")
+    
+    # Sort chronologically
+    # Extract year and period number for sorting
+    def sort_key(period_str):
+        # Check if it's month format "YYYY-MM" first
+        if '-' in period_str and len(period_str.split('-')) == 2:
+            # Month format: "2025-01"
+            parts = period_str.split('-')
+            year = int(parts[0])
+            month = int(parts[1])
+            return (year, month)
+        
+        # For other formats: "2024 Q1", "2024 T1", "2024 S1"
+        parts = period_str.split()
+        year = int(parts[0])
+        if len(parts) > 1:
+            period_id = parts[1]
+            # Map period identifiers to numbers for sorting
+            if period_id.startswith('T'):
+                period_num = int(period_id[1])
+            elif period_id.startswith('Q'):
+                period_num = int(period_id[1])
+            elif period_id.startswith('S'):
+                period_num = int(period_id[1])
+            else:
+                period_num = 0
+            return (year, period_num)
+        else:
+            return (year, 0)
+    
+    period_counts['sort_key'] = period_counts['period'].apply(sort_key)
+    period_counts = period_counts.sort_values('sort_key')
+    period_counts = period_counts.drop('sort_key', axis=1).reset_index(drop=True)
+    
+    return period_counts
+
+
 def get_stopwords():
     """Get list of common stopwords in Portuguese and English using NLTK."""
     # Get Portuguese stopwords from NLTK
@@ -803,6 +895,70 @@ def main():
             fig_total.update_traces(textposition='inside', textfont_size=12)
             fig_total.update_layout(height=400, showlegend=False)
             st.plotly_chart(fig_total, width='stretch')
+            
+            st.markdown("---")
+            
+            # Messages by time period (month, trimester, quarter, semester)
+            st.header("Mensagens por Período")
+            
+            # Dropdown for time period selection
+            period_options = {
+                'Mês': 'month',
+                'Trimestre': 'trimester',
+                'Trimestre (Q1-Q4)': 'quarter',
+                'Semestre': 'semester'
+            }
+            selected_period_label = st.selectbox(
+                "Selecionar Período",
+                options=list(period_options.keys()),
+                index=0,  # Default to 'Mês'
+                help="Escolha o período de agrupamento das mensagens",
+                key="time_period_select"
+            )
+            selected_period_type = period_options[selected_period_label]
+            
+            # Group messages by selected time period
+            period_counts = group_by_time_period(filtered_df, selected_period_type)
+            
+            if not period_counts.empty:
+                # Calculate percentages
+                total_all_periods = period_counts['count'].sum()
+                period_counts['percentage'] = (period_counts['count'] / total_all_periods * 100) if total_all_periods > 0 else 0
+                
+                # Use percentage or absolute value based on toggle
+                if use_percentage:
+                    period_counts['display_value'] = period_counts['percentage']
+                    period_counts['text'] = period_counts['percentage'].apply(lambda x: f'{x:.1f}%')
+                    y_label = 'Porcentagem de Mensagens'
+                else:
+                    period_counts['display_value'] = period_counts['count']
+                    period_counts['text'] = period_counts['count'].apply(lambda x: f'{x:,}')
+                    y_label = 'Número de Mensagens'
+                
+                # Create period label for title
+                period_title_map = {
+                    'month': 'Mês',
+                    'trimester': 'Trimestre',
+                    'quarter': 'Trimestre (Q1-Q4)',
+                    'semester': 'Semestre'
+                }
+                period_title = period_title_map[selected_period_type]
+                
+                fig_period = px.bar(
+                    period_counts,
+                    x='period',
+                    y='display_value',
+                    title=f'Mensagens por {period_title}',
+                    labels={'period': period_title, 'display_value': y_label},
+                    color='display_value',
+                    color_continuous_scale='viridis',
+                    text='text'
+                )
+                fig_period.update_traces(textposition='inside', textfont_size=12)
+                fig_period.update_layout(height=400, showlegend=False, xaxis_tickangle=-45)
+                st.plotly_chart(fig_period, width='stretch')
+            else:
+                st.info("Não há dados disponíveis para o período selecionado.")
             
             st.markdown("---")
             
