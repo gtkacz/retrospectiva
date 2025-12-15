@@ -38,7 +38,7 @@ NAME_MAP = {
     'Ariel Hacham': ['Hacham'],
     'Bruno Menache': ['Bruno Menache'],
     'Bruno Skorkowski': ['Bubis', 'Bruno Skorkowski'],
-    'Bruno Stisin': ['Bruno Stisin', r'â\x80\x8eVocÃª', r'âVocÃª'],
+    'Bruno Stisin': ['Bruno Stisin', r'â\x80\x8eVocÃª', r'âVocÃª', r'âYou', 'âYou', '‎You', r'‎You'],
     'Daniel Farina': ['Dummyts', r'~â\x80¯Daniel Turkie Farina', 'Dani Faras'],
     'Daniel Mesnik': ['Mesnik'],
     'David Cohen': ['David Cohen'],
@@ -204,7 +204,7 @@ def load_and_parse_messages(chat_file_url):
     # Convert date - match notebook format exactly (notebook uses space, but actual string has comma)
     # Replace comma with space to match notebook format string
     df['date'] = df['date'].str.replace(', ', ' ', regex=False)
-    df['date'] = pd.to_datetime(df['date'], format='%d/%m/%Y %H:%M:%S', errors='coerce')
+    df['date'] = pd.to_datetime(df['date'], format='%d/%m/%y %H:%M:%S', errors='coerce')
     df = df.dropna(subset=['date'])
     
     if df.empty:
